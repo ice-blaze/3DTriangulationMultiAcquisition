@@ -58,7 +58,7 @@ int main()
     NOEUD* racine = new NOEUD();
     racine->cle[0] = racine->cle[1] = racine->cle[2] = 0;
 
-    const long NB_MAX = 6000000;
+    const long NB_MAX = 60000000;
 
     vector<NOEUD> noeuds(NB_MAX);
 
@@ -74,7 +74,7 @@ int main()
         noeuds[i].cle[1] = rand();
         noeuds[i].cle[2] = rand();
 
-        if(i%100000==0)
+        if(i%1000000==0)
             cout << "complete : " << i << endl;
     }
     cout << "end" << endl;
