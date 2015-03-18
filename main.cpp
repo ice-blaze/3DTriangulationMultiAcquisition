@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <ctime>
 #include <cstdlib>
-#include <vector>
 
 using namespace std;
 
@@ -60,8 +59,8 @@ int main()
 
     const long NB_MAX = 60000000;
 
-    vector<NOEUD> noeuds(NB_MAX);
     clock_t t1=clock();
+    NOEUD* noeuds= new NOEUD[NB_MAX];
 
     for(long i=0;i<NB_MAX;i++)
     {
