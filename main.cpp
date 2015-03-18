@@ -61,6 +61,7 @@ int main()
     const long NB_MAX = 60000000;
 
     vector<NOEUD> noeuds(NB_MAX);
+    clock_t t1=clock();
 
     for(long i=0;i<NB_MAX;i++)
     {
@@ -74,9 +75,10 @@ int main()
         noeuds[i].cle[1] = rand();
         noeuds[i].cle[2] = rand();
 
-        if(i%1000000==0)
+        if(i%10000000==0)
             cout << "complete : " << i << endl;
     }
-    cout << "end" << endl;
+    clock_t t2=clock();
+    cout << (float)t2-(float)t1 << " end" << endl;
     return 0;
 }
