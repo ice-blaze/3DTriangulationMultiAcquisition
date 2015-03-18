@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <ctime>
 #include <cstdlib>
-#include <vector>
 #include "Node.h"
 
 
@@ -53,12 +52,17 @@ using namespace std;
 // perf 5.4
 int main()
 {
+    clock_t t1=clock();
+    clock_t t2=clock();
+
     srand (time(NULL));
     Node* racine = new Node();
     racine->key[0] = racine->key[1] = racine->key[2] = 0;
+
     const long NB_MAX = 60000000;
-    vector<Node> noeuds(NB_MAX);
-    clock_t t1=clock();
+
+    Node* noeuds= new Node[60000000];
+
     for(long i=0; i<NB_MAX; i++)
     {
 // NOEUD* noeud = new NOEUD();
@@ -69,10 +73,10 @@ int main()
         noeuds[i].key[0] = rand();
         noeuds[i].key[1] = rand();
         noeuds[i].key[2] = rand();
-        if(i%1000000==0)
+        if(i%10000000==0)
             cout << "complete : " << i << endl;
     }
-    clock_t t2=clock();
+    t2=clock();
     cout << (float)t2-(float)t1 << " end" << endl;
     return 0;
 }
