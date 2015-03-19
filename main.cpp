@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <cstdio>
 #include <ctime>
 #include <cstdlib>
@@ -57,22 +58,28 @@ int main()
     NOEUD* racine = new NOEUD();
     racine->cle[0] = racine->cle[1] = racine->cle[2] = 0;
 
-    const long NB_MAX = 60000000;
+    std::ifstream fin("data/scan6_zoneB.bin", ios::binary);
+    double stationx,stationy,stationz;
+    unsigned int nb_points, donee_supp;
+
+    fin.read(reinterpret_cast<char*>(&stationx), sizeof stationx);
+    fin.read(reinterpret_cast<char*>(&stationy), sizeof stationy);
+    fin.read(reinterpret_cast<char*>(&stationz), sizeof stationz);
+
+    fin.read(reinterpret_cast<char*>(&nb_points), sizeof nb_points);
+    fin.read(reinterpret_cast<char*>(&donee_supp), sizeof donee_supp);
 
     clock_t t1=clock();
-    NOEUD* noeuds= new NOEUD[NB_MAX];
+    NOEUD* noeuds= new NOEUD[nb_points];
 
-    for(long i=0;i<NB_MAX;i++)
+    int x,y,z;
+    for(unsigned int i=0;i<nb_points;i++)
     {
-//        NOEUD* noeud = new NOEUD();
-//        noeud->cle[0] = rand();
-//        noeud->cle[1] = rand();
-//        noeud->cle[2] = rand();
-//        inserer(&racine,noeud,0);
+        fin.read(reinterpret_cast<char*>(&noeuds[i].cle[0]), sizeof noeuds[i].cle[0]);
+        fin.read(reinterpret_cast<char*>(&noeuds[i].cle[1]), sizeof noeuds[i].cle[1]);
+        fin.read(reinterpret_cast<char*>(&noeuds[i].cle[2]), sizeof noeuds[i].cle[2]);
 
-        noeuds[i].cle[0] = rand();
-        noeuds[i].cle[1] = rand();
-        noeuds[i].cle[2] = rand();
+        inserer(&racine,&noeuds[i],0);
 
         if(i%10000000==0)
             cout << "complete : " << i << endl;
