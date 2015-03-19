@@ -4,52 +4,9 @@
 #include <ctime>
 #include <cstdlib>
 
+#include "Noeud.h"
+
 using namespace std;
-
-const int K = 3;
-
-typedef struct NOEUD
-{
-    double cle[K];
-    struct NOEUD *g;
-    struct NOEUD *d;
-} NOEUD;
-
-void inserer(NOEUD **arbre, NOEUD *element, int prof)
-{
-    if (*arbre == NULL)
-        (*arbre) = element;
-    else if ((*arbre)->cle[prof%K] < element->cle[prof%K])
-        inserer(&(*arbre)->d, element, prof+1);
-    else
-        inserer(&(*arbre)->g, element, prof+1);
-}
-
-int rapporter(double cle[K], double min[K], double max[K])
-{
-    int i, dedans = 1;
-    for (i = 0; i < K && dedans; i++)
-        dedans = dedans && min[i] <= cle[i] && max[i] >= cle[i];
-    if (dedans) // Rapporter le point
-    {
-        for (i = 0; i < K; i++)
-            printf("%f ", cle[i]);
-        printf("\n");
-    }
-    return dedans;
-}
-
-void recherche(NOEUD *arbre, double min[K], double max[K],int prof)
-{
-    if (arbre) // arbre non vide
-    {
-        if (arbre->cle[prof%K] >= min[prof%K])
-            recherche(arbre->g, min, max, prof+1);
-        rapporter(arbre->cle, min, max);
-        if (arbre->cle[prof%K] <= max[prof%K])
-            recherche(arbre->d, min, max, prof+1);
-    }
-}
 
 int main()
 {
@@ -58,7 +15,9 @@ int main()
     NOEUD* racine = new NOEUD();
     racine->cle[0] = racine->cle[1] = racine->cle[2] = 0;
 
-    std::ifstream fin("data/scan6_zoneB.bin", ios::binary);
+
+
+    ifstream fin("data/scan6_zoneB.bin", ios::binary);
     double stationx,stationy,stationz;
     unsigned int nb_points, donee_supp;
 
@@ -72,19 +31,49 @@ int main()
     clock_t t1=clock();
     NOEUD* noeuds= new NOEUD[nb_points];
 
-    int x,y,z;
+    double x,y,z;
     for(unsigned int i=0;i<nb_points;i++)
     {
-        fin.read(reinterpret_cast<char*>(&noeuds[i].cle[0]), sizeof noeuds[i].cle[0]);
-        fin.read(reinterpret_cast<char*>(&noeuds[i].cle[1]), sizeof noeuds[i].cle[1]);
-        fin.read(reinterpret_cast<char*>(&noeuds[i].cle[2]), sizeof noeuds[i].cle[2]);
 
+        fin.read(reinterpret_cast<char*>(&x), sizeof x);
+        fin.read(reinterpret_cast<char*>(&y), sizeof y);
+        fin.read(reinterpret_cast<char*>(&z), sizeof z);
+
+        noeuds[i].cle[0] = convertFloatInt(x);
+        noeuds[i].cle[1] = convertFloatInt(y);
+        noeuds[i].cle[2] = convertFloatInt(z);
         inserer(&racine,&noeuds[i],0);
 
-        if(i%10000000==0)
+        if(i%10000000==0){
             cout << "complete : " << i << endl;
+        }
     }
     clock_t t2=clock();
     cout << (float)t2-(float)t1 << " end" << endl;
+    ofstream fout("data/output.ply",  ios::out);
+    fout << "ply" <<endl;
+    fout << "format binary_little_endian 1.0" << endl; // binary
+    fout << "comment author: Etienne Frank University of applied science HES-SO" << endl;
+    fout << "element vertex "<< nb_points << endl;
+    fout << "property float x" << endl;
+    fout << "property float y" << endl;
+    fout << "property float z" << endl;
+    fout << "element face "<< 0 << endl;
+    fout << "property list uchar int32 vertex_index" << endl;
+    fout << "end_header" << endl;
+    fout.close();
+    ofstream fout2("data/output.ply",  ios::out| ios::binary| ios::app);
+    float temp;
+    for(unsigned int i=0;i<nb_points;i++)
+    {
+        temp = convertIntFloat(noeuds[i].cle[0]);
+        fout2.write((char *) &temp, sizeof(temp));
+        temp = convertIntFloat(noeuds[i].cle[1]);
+        fout2.write((char *) &temp, sizeof(temp));
+        temp = convertIntFloat(noeuds[i].cle[2]);
+        fout2.write((char *) &temp, sizeof(temp));
+    }
+    fout2.close();
+
     return 0;
 }
