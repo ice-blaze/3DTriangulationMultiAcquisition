@@ -6,6 +6,10 @@
 #include <list>
 #include <vector>
 
+const int MUL = 1000000;
+int convertFloatInt(float _val) { return _val*MUL; }
+float convertIntFloat(int _val) { return _val/(float)MUL; }
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef CGAL::Triangulation_3<K> Triangulation;
 typedef Triangulation::Cell_handle Cell_handle;
@@ -34,7 +38,7 @@ int main()
     clock_t t1=clock();
 
     double x,y,z;
-    for(unsigned int i=0;i<nb_points;i++)
+    for(unsigned int i=0;i<50000;i++)
     {
 
         fin.read(reinterpret_cast<char*>(&x), sizeof x);
@@ -43,7 +47,7 @@ int main()
 
         L.push_front(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
 
-        if(i%10000000==0){
+        if(i%1000000==0){
             cout << "complete : " << i << endl;
         }
     }
@@ -60,7 +64,9 @@ int main()
 //}
 
     clock_t t2=clock();
-    cout << (float)t2-(float)t1 << " end" << endl;
+    int minutes = (t2-t1)/60;
+    float secondes = (t2-t1);
+    cout << minutes << ":"<< secondes << " end" << endl;
 //    ofstream fout("data/output.ply",  ios::out);
 //    fout << "ply" <<endl;
 //    fout << "format binary_little_endian 1.0" << endl; // binary
