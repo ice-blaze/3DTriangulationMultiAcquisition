@@ -1,8 +1,6 @@
 #include "Chrono.h"
-#include <string>
 #include <iostream>
 #include <ctime>
-#include <cmath>
 
 using namespace std;
 
