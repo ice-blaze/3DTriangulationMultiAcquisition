@@ -1,10 +1,11 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Triangulation_data_structure_3.h>
 #include <CGAL/Triangulation_3.h>
 #include <iostream>
 #include <fstream>
 #include <cassert>
 #include <list>
-#include <vector>
+#include "Chrono.h"
 
 const int MUL = 1000000;
 int convertFloatInt(float _val) { return _val*MUL; }
@@ -35,10 +36,10 @@ int main()
     fin.read(reinterpret_cast<char*>(&nb_points), sizeof nb_points);
     fin.read(reinterpret_cast<char*>(&donee_supp), sizeof donee_supp);
 
-    clock_t t1=clock();
+    Chrono chrono = Chrono();
 
     double x,y,z;
-    for(unsigned int i=0;i<50000;i++)
+    for(unsigned int i=0;i<1000/*nb_points/**/;i++)
     {
 
         fin.read(reinterpret_cast<char*>(&x), sizeof x);
@@ -52,21 +53,33 @@ int main()
         }
     }
 
-
     Triangulation T(L.begin(), L.end());
-    Triangulation::size_type n = T.number_of_vertices();
+    Triangulation::size_type nb_vertices = T.number_of_vertices();
 
+//    T.
 //    ofstream oFileT("output",ios::out);
 //    oFileT << T;
 //    Triangulation T1;
 //    ifstream iFileT("output",ios::in);
 //    return 0;
 //}
+//    for (typename std::vector<Point>::const_iterator p = points.begin(), end = points.end();
+//              p != end; ++p)
+    for (Triangulation::All_cells_iterator it = T.all_cells_begin(), end = T.all_cells_end(); it!= end ; ++it)
+    {
+        for(unsigned int index=0; index < 4; index++) {
+//            Triangulation_data_structure::Facet f = std::pair<Cell_handle,int>(it,index);
+//            Vertex_triple vt_aux = this->make_vertex_triple(f);
+//            Vertex_triple vt(vmap[vt_aux.first],vmap[vt_aux.third],vmap[vt_aux.second]);
+//            this->make_canonical(vt);
+//            inner_map[vt]= f;
+        }
+    }
+    cout << T.number_of_edges() << endl;
+    cout << "Triangulation end" << endl;
+    chrono.printTime();
+    cout << "Write ply file start" << endl;
 
-    clock_t t2=clock();
-    int minutes = (t2-t1)/60;
-    float secondes = (t2-t1);
-    cout << minutes << ":"<< secondes << " end" << endl;
 //    ofstream fout("data/output.ply",  ios::out);
 //    fout << "ply" <<endl;
 //    fout << "format binary_little_endian 1.0" << endl; // binary
@@ -75,7 +88,7 @@ int main()
 //    fout << "property float x" << endl;
 //    fout << "property float y" << endl;
 //    fout << "property float z" << endl;
-//    fout << "element face "<< 0 << endl;
+//    fout << "element face "<< T.number_of_cells() << endl;
 //    fout << "property list uchar int32 vertex_index" << endl;
 //    fout << "end_header" << endl;
 //    fout.close();
@@ -91,6 +104,8 @@ int main()
 //        fout2.write((char *) &temp, sizeof(temp));
 //    }
 //    fout2.close();
+
+    cout << "PLY file writed" << endl;
 
     return 0;
 }
