@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <ctime>
 #include <cstdlib>
+#include "Chrono.h"
 
 using namespace std;
 
@@ -69,7 +70,8 @@ int main()
     fin.read(reinterpret_cast<char*>(&nb_points), sizeof nb_points);
     fin.read(reinterpret_cast<char*>(&donee_supp), sizeof donee_supp);
 
-    clock_t t1=clock();
+    Chrono chrono = Chrono();
+
     NOEUD* noeuds= new NOEUD[nb_points];
 
     int x,y,z;
@@ -84,7 +86,8 @@ int main()
         if(i%1000000==0)
             cout << "complete : " << i << endl;
     }
-    clock_t t2=clock();
-    cout << (float)t2-(float)t1 << " end" << endl;
+
+    chrono.printTime();
+
     return 0;
 }
