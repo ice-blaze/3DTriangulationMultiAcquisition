@@ -1,6 +1,8 @@
-#include <vector>
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Delaunay_triangulation_3.h>
+#include <CGAL/Simple_cartesian.h>
+#include <CGAL/point_generators_3.h>
+#include <CGAL/Orthogonal_k_neighbor_search.h>
+#include <CGAL/Search_traits_3.h>
+
 
 #include <iostream>
 #include <fstream>
@@ -12,9 +14,11 @@ const int MUL = 1000000;
 int convertFloatInt(float _val) { return _val*MUL; }
 float convertIntFloat(int _val) { return _val/(float)MUL; }
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-typedef CGAL::Delaunay_triangulation_3<Kernel> Delaunay;
-typedef Kernel::Point_3 Point;
+typedef CGAL::Simple_cartesian<double> K;
+typedef K::Point_3 Point;
+typedef CGAL::Search_traits_3<K> TreeTraits;
+typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
+typedef Neighbor_search::Tree Tree;
 
 using namespace std;
 
@@ -46,14 +50,18 @@ int main()
 
         // TODO à test
 //        L.insert(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
-        L.push_front(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
+        L.push_front(Point(x,y,z));
 
         if(i%1000000==0){
             cout << "complete : " << i << endl;
         }
     }
 
-    Delaunay T(L.begin(), L.end());
+    Point query = L.front();
+    L.pop_front();
+    Tree T(L.begin(), L.end());
+
+    Neighbor_search search(T, query, L.size());
     chrono.printTime();
 
 //    T.
@@ -82,7 +90,7 @@ int main()
 //        temp2++;
 //    }
 //    cout << T.number_of_edges() << endl;
-    cout << "Triangulation delaunay end" << endl;
+    cout << "kdtree construct end" << endl;
     cout << "Write ply file start" << endl;
 
 //    ofstream fout("data/output.ply",  ios::out);
