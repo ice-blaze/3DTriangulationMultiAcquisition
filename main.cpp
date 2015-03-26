@@ -26,7 +26,7 @@ using namespace std;
 int main()
 {
 // construction from a list of points :
-    vector<Point> L;
+    list<Point> L;
 
     ifstream fin("data/scan6_zoneB.bin", ios::binary);
     double stationx,stationy,stationz;
@@ -51,7 +51,7 @@ int main()
 
         // TODO à test
 //        L.insert(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
-        L.push_back(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
+        L.push_front(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
 
         if(i%1000000==0){
             cout << "complete : " << i << endl;
@@ -59,7 +59,7 @@ int main()
     }
 
     Triangulation T(L.begin(), L.end());
-    Triangulation::size_type nb_vertices = T.number_of_vertices();
+//    Triangulation::size_type nb_vertices = T.number_of_vertices();
     chrono.printTime();
 
 //    T.
@@ -72,11 +72,11 @@ int main()
 //    for (typename std::vector<Point>::const_iterator p = points.begin(), end = points.end();
 //              p != end; ++p)
 
-    int temp2 = 0;
-    for (Triangulation::Finite_facets_iterator it = T.finite_facets_begin(), end = T.finite_facets_end(); it!= end ; ++it)
+//    int temp2 = 0;
+//    for (Triangulation::Finite_facets_iterator it = T.finite_facets_begin(), end = T.finite_facets_end(); it!= end ; ++it)
 //    for (Triangulation::Finite_cells_iterator it = T.finite_cells_begin(), end = T.finite_cells_end(); it!= end ; ++it)
-    {
-        Triangulation::Facet tem = *it;
+//    {
+//        Triangulation::Facet tem = *it;
 //        Triangulation::Triangle triangle = T.triangle(tem);
 //        it->vertex(0);
 //        cout << it->vertex(0)->point() << " " << it->vertex(1)->point() << " " << it->vertex(2)->point() << endl;
@@ -85,8 +85,8 @@ int main()
 //        L.
 //        cout << it->vertex(0)->info()<<endl;
 //        cout << temp2 << endl;
-        temp2++;
-    }
+//        temp2++;
+//    }
     cout << T.number_of_edges() << endl;
     cout << "Triangulation end" << endl;
     cout << "Write ply file start" << endl;
