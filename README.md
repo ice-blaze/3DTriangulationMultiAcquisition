@@ -12,14 +12,14 @@
 * triangulation cgal
 * 2 triangulation séparé dans un premier coup et ensuite la triangulation a merger
 
-##### Comparatif PERFORMANCE
+##### Comparatif PERFORMANCE sur fichier à 6 millions de points
 * CGAL triangulation normale
-  * 12m3s
-* CGAL triangulation différente
-  * -
+  * 14m11s
+* CGAL triangulation Delaunay
+  * 13m55s
 * CGAL KD
-  * -
+  * 2m24s
 * KD Perso
-  * -
+  * 8s
 * Triangulation Perso
   * -
