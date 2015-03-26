@@ -23,3 +23,13 @@
   * 8s
 * Triangulation Perso
   * -
+
+##### Structure du Rapport
+* Introduction
+* Description du problème
+* Développement de l'algorithme
+  * Fonctionnement du principe
+  * Structures de données utilisées
+  * Technologie(c/c++/CGAL)
+  * Perfomances (complexité, speedups)
+* Conclusion (synthèse des resultats futur)
