@@ -1,6 +1,9 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Triangulation_data_structure_3.h>
 #include <CGAL/Triangulation_3.h>
+#include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <vector>
+
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -23,7 +26,7 @@ using namespace std;
 int main()
 {
 // construction from a list of points :
-    list<Point> L;
+    vector<Point> L;
 
     ifstream fin("data/scan6_zoneB.bin", ios::binary);
     double stationx,stationy,stationz;
@@ -39,14 +42,16 @@ int main()
     Chrono chrono = Chrono();
 
     double x,y,z;
-    for(unsigned int i=0;i<1000/*nb_points/**/;i++)
+    for(unsigned int i=0;i</*1000/**/nb_points/**/;i++)
     {
 
         fin.read(reinterpret_cast<char*>(&x), sizeof x);
         fin.read(reinterpret_cast<char*>(&y), sizeof y);
         fin.read(reinterpret_cast<char*>(&z), sizeof z);
 
-        L.push_front(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
+        // TODO à test
+//        L.insert(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
+        L.push_back(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
 
         if(i%1000000==0){
             cout << "complete : " << i << endl;
@@ -55,6 +60,7 @@ int main()
 
     Triangulation T(L.begin(), L.end());
     Triangulation::size_type nb_vertices = T.number_of_vertices();
+    chrono.printTime();
 
 //    T.
 //    ofstream oFileT("output",ios::out);
@@ -65,19 +71,24 @@ int main()
 //}
 //    for (typename std::vector<Point>::const_iterator p = points.begin(), end = points.end();
 //              p != end; ++p)
-    for (Triangulation::All_cells_iterator it = T.all_cells_begin(), end = T.all_cells_end(); it!= end ; ++it)
+
+    int temp2 = 0;
+    for (Triangulation::Finite_facets_iterator it = T.finite_facets_begin(), end = T.finite_facets_end(); it!= end ; ++it)
+//    for (Triangulation::Finite_cells_iterator it = T.finite_cells_begin(), end = T.finite_cells_end(); it!= end ; ++it)
     {
-        for(unsigned int index=0; index < 4; index++) {
-//            Triangulation_data_structure::Facet f = std::pair<Cell_handle,int>(it,index);
-//            Vertex_triple vt_aux = this->make_vertex_triple(f);
-//            Vertex_triple vt(vmap[vt_aux.first],vmap[vt_aux.third],vmap[vt_aux.second]);
-//            this->make_canonical(vt);
-//            inner_map[vt]= f;
-        }
+        Triangulation::Facet tem = *it;
+//        Triangulation::Triangle triangle = T.triangle(tem);
+//        it->vertex(0);
+//        cout << it->vertex(0)->point() << " " << it->vertex(1)->point() << " " << it->vertex(2)->point() << endl;
+//        cout << triangle << endl;
+//        return 0;
+//        L.
+//        cout << it->vertex(0)->info()<<endl;
+//        cout << temp2 << endl;
+        temp2++;
     }
     cout << T.number_of_edges() << endl;
     cout << "Triangulation end" << endl;
-    chrono.printTime();
     cout << "Write ply file start" << endl;
 
 //    ofstream fout("data/output.ply",  ios::out);
@@ -88,7 +99,7 @@ int main()
 //    fout << "property float x" << endl;
 //    fout << "property float y" << endl;
 //    fout << "property float z" << endl;
-//    fout << "element face "<< T.number_of_cells() << endl;
+//    fout << "element face "<< 0/*T.number_of_cells()/**/ << endl;
 //    fout << "property list uchar int32 vertex_index" << endl;
 //    fout << "end_header" << endl;
 //    fout.close();
@@ -96,11 +107,11 @@ int main()
 //    float temp;
 //    for(unsigned int i=0;i<nb_points;i++)
 //    {
-//        temp = convertIntFloat(noeuds[i].cle[0]);
+//        temp = convertIntFloat(L[i].x());
 //        fout2.write((char *) &temp, sizeof(temp));
-//        temp = convertIntFloat(noeuds[i].cle[1]);
+//        temp = convertIntFloat(L[i].y());
 //        fout2.write((char *) &temp, sizeof(temp));
-//        temp = convertIntFloat(noeuds[i].cle[2]);
+//        temp = convertIntFloat(L[i].z());
 //        fout2.write((char *) &temp, sizeof(temp));
 //    }
 //    fout2.close();
