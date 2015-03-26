@@ -21,7 +21,7 @@ using namespace std;
 int main()
 {
 // construction from a list of points :
-    vector<Point> L;
+    list<Point> L;
 
     ifstream fin("data/scan6_zoneB.bin", ios::binary);
     double stationx,stationy,stationz;
@@ -46,14 +46,14 @@ int main()
 
         // TODO à test
 //        L.insert(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
-        L.push_back(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
+        L.push_front(Point(convertFloatInt(x),convertFloatInt(y),convertFloatInt(z)));
 
         if(i%1000000==0){
             cout << "complete : " << i << endl;
         }
     }
 
-//    Delaunay T(L.begin(), L.end());
+    Delaunay T(L.begin(), L.end());
     chrono.printTime();
 
 //    T.
