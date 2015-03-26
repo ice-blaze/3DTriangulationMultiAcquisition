@@ -81,7 +81,7 @@ int main()
 
         inserer(&racine,&noeuds[i],0);
 
-        if(i%10000000==0)
+        if(i%1000000==0)
             cout << "complete : " << i << endl;
     }
     clock_t t2=clock();
