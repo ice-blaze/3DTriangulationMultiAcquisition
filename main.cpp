@@ -1,8 +1,6 @@
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Triangulation_data_structure_3.h>
-#include <CGAL/Triangulation_3.h>
-#include <CGAL/Triangulation_vertex_base_with_info_3.h>
 #include <vector>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Delaunay_triangulation_3.h>
 
 #include <iostream>
 #include <fstream>
@@ -14,12 +12,9 @@ const int MUL = 1000000;
 int convertFloatInt(float _val) { return _val*MUL; }
 float convertIntFloat(int _val) { return _val/(float)MUL; }
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef CGAL::Triangulation_3<K> Triangulation;
-typedef Triangulation::Cell_handle Cell_handle;
-typedef Triangulation::Vertex_handle Vertex_handle;
-typedef Triangulation::Locate_type Locate_type;
-typedef Triangulation::Point Point;
+typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
+typedef CGAL::Delaunay_triangulation_3<Kernel> Delaunay;
+typedef Kernel::Point_3 Point;
 
 using namespace std;
 
@@ -58,8 +53,7 @@ int main()
         }
     }
 
-    Triangulation T(L.begin(), L.end());
-    Triangulation::size_type nb_vertices = T.number_of_vertices();
+//    Delaunay T(L.begin(), L.end());
     chrono.printTime();
 
 //    T.
@@ -72,11 +66,11 @@ int main()
 //    for (typename std::vector<Point>::const_iterator p = points.begin(), end = points.end();
 //              p != end; ++p)
 
-    int temp2 = 0;
-    for (Triangulation::Finite_facets_iterator it = T.finite_facets_begin(), end = T.finite_facets_end(); it!= end ; ++it)
+//    int temp2 = 0;
+//    for (Triangulation::Finite_facets_iterator it = T.finite_facets_begin(), end = T.finite_facets_end(); it!= end ; ++it)
 //    for (Triangulation::Finite_cells_iterator it = T.finite_cells_begin(), end = T.finite_cells_end(); it!= end ; ++it)
-    {
-        Triangulation::Facet tem = *it;
+//    {
+//        Triangulation::Facet tem = *it;
 //        Triangulation::Triangle triangle = T.triangle(tem);
 //        it->vertex(0);
 //        cout << it->vertex(0)->point() << " " << it->vertex(1)->point() << " " << it->vertex(2)->point() << endl;
@@ -85,10 +79,10 @@ int main()
 //        L.
 //        cout << it->vertex(0)->info()<<endl;
 //        cout << temp2 << endl;
-        temp2++;
-    }
-    cout << T.number_of_edges() << endl;
-    cout << "Triangulation end" << endl;
+//        temp2++;
+//    }
+//    cout << T.number_of_edges() << endl;
+    cout << "Triangulation delaunay end" << endl;
     cout << "Write ply file start" << endl;
 
 //    ofstream fout("data/output.ply",  ios::out);
