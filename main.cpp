@@ -27,6 +27,7 @@ double xmin = -10.0, xmax = 30.0,
        zmin = -10.0, zmax = 30.0;
 
 typedef struct {double x; double y; double z;} POINT;
+typedef struct {unsigned char x; unsigned char y; unsigned char z;} COULEUR;
 
 const int FALSE = 0;
 const int TRUE = 1;
@@ -470,9 +471,9 @@ POINT extrait_station(char chemin_ply[]){
 /* le point p est du même côté du triangle p1 p2 p3 que le point q */
 int visible(POINT p, POINT q, POINT p1, POINT p2, POINT p3)
 { POINT v12 = {p2.x-p1.x, p2.y-p1.y, p2.z-p1.z},
-         v13 = {p3.x-p1.x, p3.y-p1.y, p3.z-p1.z},
-         v1p = {p.x-p1.x, p.y-p1.y, p.z-p1.z},
-         v1q = {q.x-p1.x, q.y-p1.y, q.z-p1.z},
+        v13 = {p3.x-p1.x, p3.y-p1.y, p3.z-p1.z},
+        v1p = {p.x-p1.x, p.y-p1.y, p.z-p1.z},
+        v1q = {q.x-p1.x, q.y-p1.y, q.z-p1.z},
      v12xv13 = {v12.y*v13.z-v12.z*v13.y,
                 v12.z*v13.x-v12.x*v13.z,
                 v12.x*v13.z-v12.z*v13.x};
@@ -487,6 +488,37 @@ int dedans(POINT p)
 
 int main(int argc, char* argv[])
 {
+  COULEUR couleurs[6];
+  couleurs[0].x=0  ; couleurs[0].y=0  ; couleurs[0].z=255;
+  couleurs[1].x=0  ; couleurs[1].y=255; couleurs[1].z=0  ;
+  couleurs[2].x=255; couleurs[2].y=0  ; couleurs[2].z=0  ;
+  couleurs[3].x=0  ; couleurs[3].y=255; couleurs[3].z=255;
+  couleurs[4].x=255; couleurs[4].y=0  ; couleurs[4].z=255;
+  couleurs[5].x=255; couleurs[5].y=255; couleurs[5].z=0  ;
+
+
+  /*TEST*/
+
+//  POINT p1,p2,p3,p4,p5,p6,p7,p8;
+//  p1.x=0;p1.y=0;p1.z=0;
+//  p2.x=1;p2.y=0;p2.z=0;
+//  p3.x=0;p3.y=1;p3.z=0;
+//  p4.x=1;p4.y=1;p4.z=0;
+//  p5.x=0;p5.y=1;p5.z=1;
+//  p6.x=1;p6.y=1;p6.z=1;
+//  p7.x=0;p7.y=1;p7.z=1;
+//  p8.x=1;p8.y=0;p8.z=1;
+//
+//  POINT s1,s2,s3;
+//  s1.x=1;s1.y= 2;s1.z=1;
+//  s2.x=1;s2.y=-2;s2.z=100;
+//  s3.x=1;s3.y= 4;s3.z=1;
+//
+//  printf("s2 false?: %d \n",visible(s1,s2,p6,p4,p5));
+//  printf("s3 true?: %d \n",visible(s1,s3,p6,p4,p5));
+
+
+  /*TEST END*/
 
   clock_t cpu;
 
@@ -510,9 +542,9 @@ int main(int argc, char* argv[])
 
   /* récupérer les positions des stations */
   POINT stations[argc-2];
-  for(int i=1;i<argc-1;i++){
-    stations[i] = extrait_station(argv[i]);
-    printf("%g %g %g\n",stations[i].x,stations[i].y,stations[i].z);
+  for(int i=0;i<argc-3;i++){
+    stations[i] = extrait_station(argv[i+2]);
+    printf("1  %f %f %f\n",stations[i].x,stations[i].y,stations[i].z);
   }
 
   /******************* lecture du fichier de données ************************/
@@ -527,6 +559,10 @@ int main(int argc, char* argv[])
   nb_lu = fread(&origine, sizeof origine, 1, fichier);
   nb_lu = fread(&n, sizeof n, 1, fichier);
   nb_lu = fread(&taille_suppl, sizeof taille_suppl, 1, fichier);
+
+  printf("s1 %f %f %f\n",origine.x,origine.y,origine.z);
+  printf("s2 %f %f %f\n",stations[0].x,stations[0].y,stations[0].z);
+
 
   point = (POINT *) malloc(n * sizeof(POINT));
   id = (unsigned *) malloc((n+3) * sizeof(unsigned));
@@ -589,7 +625,8 @@ int main(int argc, char* argv[])
           nb_retenus);
   fprintf(fichier, "property double x\nproperty double y\nproperty double z\n");
   fprintf(fichier, "element face %d\n", nb_triangles_finaux);
-  fprintf(fichier, "property list uchar int vertex_index\nend_header\n");
+  fprintf(fichier, "property list uchar int vertex_index\n");
+  fprintf(fichier, "property uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n");
 
   for (i = 0; i < nb_retenus; i++)
     fwrite(point + id[i], 1, sizeof(POINT), fichier);
@@ -603,6 +640,18 @@ int main(int argc, char* argv[])
          fwrite(&arbre[i].p3, 1, sizeof(int), fichier);
          fwrite(&arbre[i].p2, 1, sizeof(int), fichier);
          fwrite(&arbre[i].p1, 1, sizeof(int), fichier);
+
+         /* attribut une couleur en fonction des stations qui peuvent la voir */ // TODO FAIRE DE MANIERE PROCEDURALE (masque de bit)
+         if(visible(origine,stations[0],point[arbre[i].p3],point[arbre[i].p2],point[arbre[i].p1])){
+           fwrite(&couleurs[0].x, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[0].y, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[0].z, 1, sizeof(unsigned char), fichier);
+         }else{
+           fwrite(&couleurs[1].x, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[1].y, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[1].z, 1, sizeof(unsigned char), fichier);
+         }
+
         }
     else
       ; // triangle extérieur à la scène
