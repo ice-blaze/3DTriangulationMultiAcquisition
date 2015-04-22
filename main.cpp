@@ -28,7 +28,8 @@ int main()
 // construction from a list of points :
     list<Point> L;
 
-    ifstream fin("data/scan6_zoneB.bin", ios::binary);
+//    ifstream fin("data/scan6_zoneB.bin", ios::binary);
+    ifstream fin("data/s6s100000.bin", ios::binary);
     double stationx,stationy,stationz;
     unsigned int nb_points, donee_supp;
 
@@ -63,8 +64,8 @@ int main()
     chrono.printTime();
 
 //    T.
-//    ofstream oFileT("output",ios::out);
-//    oFileT << T;
+    ofstream oFileT("output",ios::out);
+    oFileT << T;
 //    Triangulation T1;
 //    ifstream iFileT("output",ios::in);
 //    return 0;
@@ -90,6 +91,7 @@ int main()
     cout << T.number_of_edges() << endl;
     cout << "Triangulation end" << endl;
     cout << "Write ply file start" << endl;
+
 
 //    ofstream fout("data/output.ply",  ios::out);
 //    fout << "ply" <<endl;
