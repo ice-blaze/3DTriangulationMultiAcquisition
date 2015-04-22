@@ -1,25 +1,26 @@
 /***********************************************************************
-But: Calcul d'une triangulation de Delaunay sur des mesures effectuÃ©es
-par une station laser dont on connaÃ®t l'emplacement, gÃ©nÃ©ration d'un
+But: Calcul d'une triangulation de Delaunay sur des mesures effectuées
+par une station laser dont on connaît l'emplacement, génération d'un
 fichier au format ply
 
 Fichier: triangule_scan_ply.c
-Auteur & copyright: Ã‰. Taillard, 17.4.2015
+Auteur & copyright: É. Taillard, 17.4.2015
 Compilation : gcc -Wall -O3 triangule_scan_ply.c -lm
 *************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <inttypes.h> // coordonnÃ©es des points entiÃ¨res de type int32_t
+#include <inttypes.h> // coordonnées des points entières de type int32_t
 #include <math.h>
 #include <time.h>
+#include <string.h>
 
-// Pour passer de coordonnÃ©es de type double en int32_t
+// Pour passer de coordonnées de type double en int32_t
 #define PRECISION 10000000
 
-// Les points de mesure Ã  prendre en considÃ©ration seront Ã  l'intÃ©rieur d'un
-// parallÃ©lipipÃ¨de compris entre [(xmin, ymin, zmin), (xmax, ymax, zmax)]
+// Les points de mesure à prendre en considération seront à l'intérieur d'un
+// parallélipipède compris entre [(xmin, ymin, zmin), (xmax, ymax, zmax)]
 //double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
 double xmin = -10.0, xmax = 30.0,
        ymin = -20.0, ymax = 30.0,
@@ -30,7 +31,7 @@ typedef struct {double x; double y; double z;} POINT;
 const int FALSE = 0;
 const int TRUE = 1;
 
-// L'arborescence a environ 9 triangles par point; 10 pour Ãªtre confortable
+// L'arborescence a environ 9 triangles par point; 10 pour être confortable
 const int nb_triangles_par_point = 10;
 int nb_max_triangles;
 
@@ -40,7 +41,7 @@ double seconds(clock_t cpu)
 typedef struct{
   int p1, p2, p3,           // Points du triangle
       t1, t2, t3,           // Triangles adjacents ou triangles fils
-      final;}  t_triangle;  // Si le triangle n'est pas divisÃ©
+      final;}  t_triangle;  // Si le triangle n'est pas divisé
 
 
 /*************** L'Ecuyer random number generator ***************/
@@ -75,7 +76,7 @@ void transpose(int *a, int *b) {int temp = *a; *a = *b; *b = temp;}
 
 /***************************** Delaunay **************************/
 
-//Indique si le point (px, py) est Ã  gauche du segment p1->p2
+//Indique si le point (px, py) est à gauche du segment p1->p2
 int a_gauche(int32_t px, int32_t py, int p1, int p2, int32_t* x, int32_t* y)
 { int32_t wx, wy, vx, vy;
   int64_t vxwy, vywx, vxwx, vywy;
@@ -88,15 +89,15 @@ int a_gauche(int32_t px, int32_t py, int p1, int p2, int32_t* x, int32_t* y)
   vxwx = (int64_t)vx * (int64_t)wx;
   vywy = (int64_t)vy * (int64_t)wy;
   if (vxwy > vywx)
-    return -1;  // Ã  droite
+    return -1;  // à droite
   else if ((vxwy == vywx) && (vxwx >= 0) && (vywy >= 0) &&
            (abs (vx) <= abs(wx)) && (abs (vy) <= abs(wy)) )
     return 0;  // sur le segment
   else
-    return 1; // Ã  gauche
+    return 1; // à gauche
 }
 
-//Indique si le point (px, py) est dans un triangle donnÃ©
+//Indique si le point (px, py) est dans un triangle donné
 int dans_triangle(int32_t px, int32_t py, t_triangle triangle,
                   int32_t* x, int32_t* y)
 {
@@ -118,7 +119,7 @@ int dans_triangle(int32_t px, int32_t py, t_triangle triangle,
 }
 
 //Identifie dans quel triangle le point (px, py) se trouve
-//Si le point est sur une arÃªte, il est Ã  la fois dans dedans1 et dedans2
+//Si le point est sur une arête, il est à la fois dans dedans1 et dedans2
 void identifie_triangle(int32_t px, int32_t py, t_triangle * arbre,
                         int32_t* x, int32_t* y, int * dedans1, int * dedans2)
 { int triangle = 0, tri2;
@@ -181,14 +182,14 @@ void identifie_triangle(int32_t px, int32_t py, t_triangle * arbre,
 
 double sqr (double x) {return x * x;}
 
-/* vÃ©rifie si le point (x4, y4) est en dehors du cercle circonscrit par le
-   triangle 1-2-3; on fait l'hypothÃ¨se que les imprÃ©cisions des doubles
-   sont acceptables lorqu'on considÃ¨re une arÃªte comme lÃ©gale */
+/* vérifie si le point (x4, y4) est en dehors du cercle circonscrit par le
+   triangle 1-2-3; on fait l'hypothèse que les imprécisions des doubles
+   sont acceptables lorqu'on considère une arête comme légale */
 int legal(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
           int32_t x3, int32_t y3, int32_t x4, int32_t y4)
-{ double x5, y5, r; // centre du cercle, rayon au carrÃ©
+{ double x5, y5, r; // centre du cercle, rayon au carré
   double ax, ay, bx, by, cx, cy, dx, dy; // perpendiculaires aux segments 1-2 et 1-3
-  double denominateur;  // dÃ©nominateur pour le calcul de l'intersection des segments
+  double denominateur;  // dénominateur pour le calcul de l'intersection des segments
 
   ax = (x1 + x2)/2.0; ay = (y1 + y2)/2.0;
   bx = ax -  (y2 - y1); by = ay +  (x2 - x1);
@@ -209,14 +210,14 @@ int legal(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
     return TRUE;
 }
 
-//DÃ©coupe le triangle t en trois triangles t1, t2 et t3
+//Découpe le triangle t en trois triangles t1, t2 et t3
 void decoupe_triangle(int t, int t1, int t2, int t3, t_triangle* arbre)
 {
   arbre[t].t1 = t1; arbre[t].t2 = t2; arbre[t].t3 = t3; arbre[t].final = FALSE;
 }
 
-//Modifie la numÃ©rotation du triangle adjacent aprÃ¨s une dÃ©coupe
-//Le triangle qui Ã©tait adjacent Ã  "avant" devient adjacent Ã  "apres"
+//Modifie la numérotation du triangle adjacent après une découpe
+//Le triangle qui était adjacent à "avant" devient adjacent à "apres"
 void modifie_triangle_adjacent(int adjacent, int avant, int apres,
                                t_triangle* arbre)
 {  if (adjacent > 0)
@@ -229,7 +230,7 @@ void modifie_triangle_adjacent(int adjacent, int avant, int apres,
 }
 
 
-//LÃ©galise l'arÃªte commune aux triangles t1 et t2
+//Légalise l'arête commune aux triangles t1 et t2
 void legaliser(int t1, int t2, int32_t* x, int32_t* y,
                int* nb_triangles, t_triangle* arbre)
 {
@@ -238,7 +239,7 @@ void legaliser(int t1, int t2, int32_t* x, int32_t* y,
            x[arbre[t2].p2], y[arbre[t2].p2],
            x[arbre[t2].p3], y[arbre[t2].p3],
            x[arbre[t1].p1], y[arbre[t1].p1]) )
-   return; // arÃªte lÃ©gale, on ne fait rien
+   return; // arête légale, on ne fait rien
  else
  {if (arbre[t1].t2 != t2)
    {printf("t2 pas egal au second triangle adjacent de t1\n");
@@ -286,7 +287,7 @@ void legaliser(int t1, int t2, int32_t* x, int32_t* y,
  }
 }
 
-//InsÃ¨re le point d'indice p dans la triangulation
+//Insère le point d'indice p dans la triangulation
 int insere_point(int p, int32_t*x, int32_t* y, int* nb_triangles,
                  t_triangle* arbre)
 {int dedans1, dedans2;
@@ -294,13 +295,13 @@ int insere_point(int p, int32_t*x, int32_t* y, int* nb_triangles,
      t1, t2, t3, t4, t5, t6, t7, t8;
  identifie_triangle(x[p], y[p], arbre, x, y, & dedans1,  & dedans2);
 
- if (dedans1 >= 0 && dedans2 >= 0) // point superposÃ© ou sur un arÃªte
+ if (dedans1 >= 0 && dedans2 >= 0) // point superposé ou sur un arête
  { if ( (x[arbre[dedans1].p1] == x[p] && y[arbre[dedans1].p1] == y[p]) ||
         (x[arbre[dedans1].p2] == x[p] && y[arbre[dedans1].p2] == y[p]) ||
         (x[arbre[dedans1].p3] == x[p] && y[arbre[dedans1].p3] == y[p]) )
-    // Le point est  ignorÃ© car superposÃ© Ã  un point dÃ©jÃ  existant
+    // Le point est  ignoré car superposé à un point déjà existant
     return 0;
-    else // point sur une arÃªte mais pas superposÃ©
+    else // point sur une arête mais pas superposé
     {
        if (arbre[dedans1].t1 == dedans2)
        {
@@ -372,10 +373,10 @@ int insere_point(int p, int32_t*x, int32_t* y, int* nb_triangles,
        if (t1 > 0) legaliser(t7, t1, x, y, nb_triangles, arbre);
        if (t4 > 0) legaliser(t8, t4, x, y, nb_triangles, arbre);
 
-    } // point sur une arÃªte mais pas superposÃ©
+    } // point sur une arête mais pas superposé
   } //if (dedans1 >= 0 && dedans2 >= 0)
 
-  else if (dedans1 >= 0) // point Ã  l'intÃ©rieur du triangle dedans1
+  else if (dedans1 >= 0) // point à l'intérieur du triangle dedans1
   {
      pt1 = arbre[dedans1].p1;
      pt2 = arbre[dedans1].p2;
@@ -410,9 +411,9 @@ int insere_point(int p, int32_t*x, int32_t* y, int* nb_triangles,
 }
 
 //Construit une triangulation de Delaunay sur un semi de n points
-//indicÃ©s de 0 Ã  n-1. Les points n, n+1 et n+2 doivent englober la scÃ¨ne.
+//indicés de 0 à n-1. Les points n, n+1 et n+2 doivent englober la scène.
 //Retourne le nombre de triangles totaux de la triangulation, y compris
-//les triangles intermÃ©diaires de la structure de donnÃ©es permettant
+//les triangles intermédiaires de la structure de données permettant
 //d'identifier rapidement le triangle de la triangulation dans lequel un
 //point se trouve
 int construit_delaunay(int n, int32_t* x, int32_t* y, t_triangle* arbre)
@@ -447,7 +448,7 @@ int construit_delaunay(int n, int32_t* x, int32_t* y, t_triangle* arbre)
 
 /***************************** fin delaunay ************************/
 
-//Calcule l'azimuth et l'Ã©lÃ©vation d'un point p vu de "origine"
+//Calcule l'azimuth et l'élévation d'un point p vu de "origine"
 void calcule_phi_theta(POINT origine, POINT p, int32_t *phi, int32_t * theta)
 {
   double proj_hor = sqrt( (p.x - origine.x)*(p.x - origine.x) +
@@ -456,7 +457,17 @@ void calcule_phi_theta(POINT origine, POINT p, int32_t *phi, int32_t * theta)
   *theta = PRECISION * atan2(p.z - origine.z, proj_hor) + 0.5;
 }
 
-/* le point p est du mÃªme cÃ´tÃ© du triangle p1 p2 p3 que le point q */
+// recoit la position de la station du fichier
+POINT extrait_station(char chemin_ply[]){
+
+  FILE* fichier = fopen(chemin_ply, "rb");
+  POINT origine;
+  fread(&origine, sizeof origine, 1, fichier);
+  fclose(fichier);
+  return origine;
+}
+
+/* le point p est du même côté du triangle p1 p2 p3 que le point q */
 int visible(POINT p, POINT q, POINT p1, POINT p2, POINT p3)
 { POINT v12 = {p2.x-p1.x, p2.y-p1.y, p2.z-p1.z},
          v13 = {p3.x-p1.x, p3.y-p1.y, p3.z-p1.z},
@@ -469,7 +480,7 @@ int visible(POINT p, POINT q, POINT p1, POINT p2, POINT p3)
           (v1q.x*v12xv13.x + v1q.y*v12xv13.y + v1q.z*v12xv13.z) > 0;
 }
 
-// Point dans le parallÃ©pipÃ¨de retenu
+// Point dans le parallépipède retenu
 int dedans(POINT p)
 {return p.x >= xmin && p.x <= xmax &&
         p.y >= ymin && p.y <= ymax && p.z >= zmin && p.z <= zmax;}
@@ -480,31 +491,38 @@ int main(int argc, char* argv[])
   clock_t cpu;
 
   int nb_triangles; //nb triangles de la triangulation
-  int nb_retenus;   //nb points dans le parallÃ©lipipÃ¨de
+  int nb_retenus;   //nb points dans le parallélipipède
   int nb_lu;        //nb valeurs lues par fread
-  int nb_triangles_finaux; //nb triangles Ã  afficher
+  int nb_triangles_finaux; //nb triangles à afficher
   int32_t* phi;            //azimuth de chaque point
-  int32_t* theta;          //Ã©lÃ©vation de chaque point
+  int32_t* theta;          //élévation de chaque point
   unsigned *id;            //identificateur des points retenus
   t_triangle * arbre;      //noeuds de l'arborescence de la triangulation
   FILE *fichier;
 
-  if (argc != 3)
+  if (!strcmp(argv[1],"-h"))
   {
-    printf("usage: %s infile.bin outfile.ply\n", argv[0]);
+    printf("usage: %s infile1.bin [infile2.bin ... infileN.bin] outfile.ply\n", argv[0]);
     return EXIT_FAILURE;
   }
 
   cpu = clock();
 
-  /******************* lecture du fichier de donnÃ©es ************************/
+  /* récupérer les positions des stations */
+  POINT stations[argc-2];
+  for(int i=1;i<argc-1;i++){
+    stations[i] = extrait_station(argv[i]);
+    printf("%g %g %g\n",stations[i].x,stations[i].y,stations[i].z);
+  }
+
+  /******************* lecture du fichier de données ************************/
   fichier = fopen(argv[1], "rb");
 
   unsigned i, n; // nombre total de points
-  unsigned taille_suppl; //information supplÃ©mentaire pour chaque point
-  unsigned char nb_cote_triangle = 3; //Pour l'Ã©criture de 3 en binaire
-  POINT origine; //CoordonnÃ©es de l'appareil de mesure
-  POINT *point;  //CoordonnÃ©es (x,y,z) de chaque point de mesure
+  unsigned taille_suppl; //information supplémentaire pour chaque point
+  unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
+  POINT origine; //Coordonnées de l'appareil de mesure
+  POINT *point;  //Coordonnées (x,y,z) de chaque point de mesure
 
   nb_lu = fread(&origine, sizeof origine, 1, fichier);
   nb_lu = fread(&n, sizeof n, 1, fichier);
@@ -520,7 +538,7 @@ int main(int argc, char* argv[])
   if (!nb_lu) return EXIT_FAILURE;
   fclose(fichier);
 
-  /***** SÃ©lection des points Ã  retenir, calcul des azimuts et Ã©lÃ©vations ***/
+  /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
   nb_retenus = 0;
   for (i = 0; i < n; i++)
     if (dedans(point[i]))
@@ -565,8 +583,8 @@ int main(int argc, char* argv[])
 
   printf("triangles finaux %d\n", nb_triangles_finaux);
 
-  /***********Ã‰criture de la triangulation au format ply ************/
-  fichier = fopen(argv[2], "wb");
+  /***********Écriture de la triangulation au format ply ************/
+  fichier = fopen(argv[argc-1], "wb");
   fprintf(fichier, "ply\nformat binary_little_endian 1.0\nelement vertex %d\n",
           nb_retenus);
   fprintf(fichier, "property double x\nproperty double y\nproperty double z\n");
@@ -587,7 +605,7 @@ int main(int argc, char* argv[])
          fwrite(&arbre[i].p1, 1, sizeof(int), fichier);
         }
     else
-      ; // triangle extÃ©rieur Ã  la scÃ¨ne
+      ; // triangle extérieur à la scène
   fprintf(fichier, "\n");
 
   fclose(fichier);
