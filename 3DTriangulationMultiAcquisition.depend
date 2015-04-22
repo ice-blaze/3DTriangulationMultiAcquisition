@@ -1,0 +1,13 @@
+# depslib dependency file v1.0
+1427403291 source:/home/etienne/git_repos/3DTriangulationMultiAcquisition/Chrono.cpp
+	"Chrono.h"
+	<iostream>
+	<ctime>
+
+1427403291 /home/etienne/git_repos/3DTriangulationMultiAcquisition/Chrono.h
+
+1428423916 source:/home/etienne/git_repos/3DTriangulationMultiAcquisition/main.cpp
+	<boost/version.hpp>
+	<iostream>
+	<iomanip>
+
