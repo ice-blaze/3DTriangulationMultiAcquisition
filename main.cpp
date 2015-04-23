@@ -486,6 +486,21 @@ int dedans(POINT p)
 {return p.x >= xmin && p.x <= xmax &&
         p.y >= ymin && p.y <= ymax && p.z >= zmin && p.z <= zmax;}
 
+
+double distance(POINT p, POINT q){//TODO remove sqr
+  return sqr((p.x-q.x)*(p.x-q.x)+
+             (p.y-q.y)*(p.y-q.y)+
+             (p.z-q.z)*(p.z-q.z));
+}
+
+double distanceMax(POINT a, POINT b, POINT c){
+  double res1 = distance(a,b);
+  double res2 = distance(a,c);
+  double res3 = distance(c,b);
+  double res = (res1<res2)?res2:res1;
+  return (res<res3)?res3:res;
+}
+
 int main(int argc, char* argv[])
 {
   COULEUR couleurs[6];
@@ -498,7 +513,6 @@ int main(int argc, char* argv[])
 
 
   /*TEST*/
-
 //  POINT p1,p2,p3,p4,p5,p6,p7,p8;
 //  p1.x=0;p1.y=0;p1.z=0;
 //  p2.x=1;p2.y=0;p2.z=0;
@@ -516,8 +530,6 @@ int main(int argc, char* argv[])
 //
 //  printf("s2 false?: %d \n",visible(s1,s2,p6,p4,p5));
 //  printf("s3 true?: %d \n",visible(s1,s3,p6,p4,p5));
-
-
   /*TEST END*/
 
   clock_t cpu;
@@ -534,21 +546,28 @@ int main(int argc, char* argv[])
 
   if (!strcmp(argv[1],"-h"))
   {
-    printf("usage: %s infile1.bin [infile2.bin ... infileN.bin] outfile.ply\n", argv[0]);
+    printf("usage: %s precision infile1.bin [infile2.bin ... infileN.bin] outfile.ply\n", argv[0]);
     return EXIT_FAILURE;
   }
 
   cpu = clock();
 
   /* récupérer les positions des stations */
-  POINT stations[argc-2];
-  for(int i=0;i<argc-3;i++){
-    stations[i] = extrait_station(argv[i+2]);
+
+  /*                                      */
+  /*            DANGER  indices           */
+  /*                                      */
+  POINT stations[argc-4];
+  for(int i=0;i<argc-/*3TODO*/4;i++){
+    stations[i] = extrait_station(argv[i+3]);
     printf("1  %f %f %f\n",stations[i].x,stations[i].y,stations[i].z);
   }
+  const double LIMITE = atof(argv[1]);
+//  const double LIMITE = 0.05;
+
 
   /******************* lecture du fichier de données ************************/
-  fichier = fopen(argv[1], "rb");
+  fichier = fopen(argv[2], "rb");
 
   unsigned i, n; // nombre total de points
   unsigned taille_suppl; //information supplémentaire pour chaque point
@@ -609,11 +628,13 @@ int main(int argc, char* argv[])
 
   cpu = clock();
   nb_triangles_finaux = 0;
+
   for (i = 1; i < nb_triangles; i++)
   {
-    if (arbre[i].final)
+    if (arbre[i].final)file:///home/etienne/git_repos/3DTriangulationMultiAcquisition/output.ply
+
       if (arbre[i].p1 < nb_retenus && arbre[i].p2 < nb_retenus &&
-          arbre[i].p3 < nb_retenus)
+          arbre[i].p3 < nb_retenus && distanceMax(point[arbre[i].p1],point[arbre[i].p2],point[arbre[i].p3])<LIMITE)
         nb_triangles_finaux++;
    }
 
@@ -633,7 +654,7 @@ int main(int argc, char* argv[])
 
   for (i = 1; i < nb_triangles; i++)
     if (arbre[i].final)
-      if (arbre[i].p1 >= n || arbre[i].p2 >= n || arbre[i].p3 >= n )
+      if (arbre[i].p1 >= n || arbre[i].p2 >= n || arbre[i].p3 >= n || distanceMax(point[arbre[i].p1],point[arbre[i].p2],point[arbre[i].p3])>=LIMITE)
         ; // triangle fictif
       else
         {fwrite(&nb_cote_triangle, 1, sizeof(unsigned char), fichier);
