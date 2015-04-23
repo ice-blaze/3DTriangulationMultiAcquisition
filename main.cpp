@@ -501,6 +501,113 @@ double distanceMax(POINT a, POINT b, POINT c){
   return (res<res3)?res3:res;
 }
 
+typedef struct {int n; POINT origine; POINT *point;
+                unsigned *id;int32_t* phi;int32_t* theta;
+                int nb_retenus;
+                int err;} LECTURE_FICHIER;
+
+LECTURE_FICHIER lecture_fichier(char file_path[]){
+  int nb_lu;        //nb valeurs lues par fread
+  FILE *fichier;
+  unsigned taille_suppl; //information supplémentaire pour chaque point
+
+  LECTURE_FICHIER res;//result
+  res.err = TRUE;
+
+  clock_t cpu = clock();
+
+  fichier = fopen(file_path, "rb");
+
+  unsigned i, n; // nombre total de points
+  POINT origine; //Coordonnées de l'appareil de mesure
+  POINT *point;  //Coordonnées (x,y,z) de chaque point de mesure
+
+  nb_lu = fread(&origine, sizeof origine, 1, fichier);
+  nb_lu = fread(&n, sizeof n, 1, fichier);
+  nb_lu = fread(&taille_suppl, sizeof taille_suppl, 1, fichier);
+
+  point = (POINT *) malloc(n * sizeof(POINT));
+  res.id = (unsigned *) malloc((n+3) * sizeof(unsigned));
+
+  for (i = 0; i < n; i++)
+  {  nb_lu = fread(point + i, sizeof(POINT), 1, fichier);
+     fseek(fichier, taille_suppl, SEEK_CUR);
+  }
+  if (!nb_lu) {return res;}
+  fclose(fichier);
+
+  /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
+
+  int nb_retenus = 0;
+  for (i = 0; i < n; i++)
+    if (dedans(point[i])){
+      res.id[nb_retenus++] = i;
+    }
+  res.id[nb_retenus] = nb_retenus;
+  res.id[nb_retenus+1] = nb_retenus+1;
+  res.id[nb_retenus+2] = nb_retenus+2;
+
+  res.phi = (int32_t *) malloc((nb_retenus+3) * sizeof(int32_t));
+  res.theta = (int32_t *) malloc((nb_retenus+3) * sizeof(int32_t));
+  for (i = 0; i < nb_retenus; i++)
+    calcule_phi_theta(origine, point[res.id[i]], res.phi+i, res.theta+i);
+
+  printf("%s lu\n", file_path);
+  printf("%d points lus en %f secondes\n", n, seconds(cpu));
+  printf("%d nb_retenus\n",nb_retenus);
+
+
+  res.n = n;
+  res.origine = origine;
+  res.point = point;
+  res.nb_retenus = nb_retenus;
+  res.err = FALSE;
+
+  return res;
+}
+
+typedef struct {LECTURE_FICHIER inputs;
+                t_triangle * arbre;
+                int nb_triangles_finaux;
+                int nb_triangles;
+                int err;} OUTPUT_TRIANGULATION;
+
+OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
+  OUTPUT_TRIANGULATION res;
+  res.err = TRUE;
+
+  res.arbre = (t_triangle*) malloc(nb_triangles_par_point*in.nb_retenus*sizeof(t_triangle));
+  //t_triangle * arbre = res.arbre; //peut être fait comme ça ? histoire d'éviter les res. voir les in.
+
+  if (!res.arbre)
+  { printf("pas assez de memoire\n"); return res;}
+
+  clock_t cpu = clock();
+  in.phi[in.nb_retenus]   = INT_MIN/2; in.theta[in.nb_retenus]   = INT_MIN/2;
+  in.phi[in.nb_retenus+1] = INT_MAX/2; in.theta[in.nb_retenus+1] = INT_MIN/2;
+  in.phi[in.nb_retenus+2] = 0;         in.theta[in.nb_retenus+2] = INT_MAX/2;
+  res.nb_triangles = construit_delaunay(in.nb_retenus, in.phi, in.theta, res.arbre);
+  printf("arbre de %d triangles construits en %f secondes\n",
+         res.nb_triangles, seconds(cpu));
+
+  cpu = clock();
+  res.nb_triangles_finaux = 0;
+
+  for (int i = 1; i < res.nb_triangles; i++)
+  {
+    if (res.arbre[i].final)file:///home/etienne/git_repos/3DTriangulationMultiAcquisition/output.ply
+
+      if (res.arbre[i].p1 < in.nb_retenus && res.arbre[i].p2 < in.nb_retenus &&
+          res.arbre[i].p3 < in.nb_retenus && distanceMax(in.point[res.arbre[i].p1],in.point[res.arbre[i].p2],in.point[res.arbre[i].p3])<LIMITE)
+        res.nb_triangles_finaux++;
+   }
+
+  printf("triangles finaux %d\n", res.nb_triangles_finaux);
+
+  res.err = FALSE;
+  return res;
+}
+
 int main(int argc, char* argv[])
 {
   COULEUR couleurs[6];
@@ -512,7 +619,7 @@ int main(int argc, char* argv[])
   couleurs[5].x=255; couleurs[5].y=255; couleurs[5].z=0  ;
 
 
-  /*TEST*/
+  /*TEST
 //  POINT p1,p2,p3,p4,p5,p6,p7,p8;
 //  p1.x=0;p1.y=0;p1.z=0;
 //  p2.x=1;p2.y=0;p2.z=0;
@@ -532,11 +639,17 @@ int main(int argc, char* argv[])
 //  printf("s3 true?: %d \n",visible(s1,s3,p6,p4,p5));
   /*TEST END*/
 
+  if (!strcmp(argv[1],"-h"))
+  {
+    printf("usage: %s precision infile1.bin [infile2.bin ... infileN.bin] outfile.ply\n", argv[0]);
+    return EXIT_FAILURE;
+  }
+
   clock_t cpu;
 
+  unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
   int nb_triangles; //nb triangles de la triangulation
   int nb_retenus;   //nb points dans le parallélipipède
-  int nb_lu;        //nb valeurs lues par fread
   int nb_triangles_finaux; //nb triangles à afficher
   int32_t* phi;            //azimuth de chaque point
   int32_t* theta;          //élévation de chaque point
@@ -544,16 +657,9 @@ int main(int argc, char* argv[])
   t_triangle * arbre;      //noeuds de l'arborescence de la triangulation
   FILE *fichier;
 
-  if (!strcmp(argv[1],"-h"))
-  {
-    printf("usage: %s precision infile1.bin [infile2.bin ... infileN.bin] outfile.ply\n", argv[0]);
-    return EXIT_FAILURE;
-  }
-
   cpu = clock();
 
   /* récupérer les positions des stations */
-
   /*                                      */
   /*            DANGER  indices           */
   /*                                      */
@@ -563,82 +669,49 @@ int main(int argc, char* argv[])
     printf("1  %f %f %f\n",stations[i].x,stations[i].y,stations[i].z);
   }
   const double LIMITE = atof(argv[1]);
-//  const double LIMITE = 0.05;
-
 
   /******************* lecture du fichier de données ************************/
-  fichier = fopen(argv[2], "rb");
 
   unsigned i, n; // nombre total de points
-  unsigned taille_suppl; //information supplémentaire pour chaque point
-  unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
   POINT origine; //Coordonnées de l'appareil de mesure
   POINT *point;  //Coordonnées (x,y,z) de chaque point de mesure
 
-  nb_lu = fread(&origine, sizeof origine, 1, fichier);
-  nb_lu = fread(&n, sizeof n, 1, fichier);
-  nb_lu = fread(&taille_suppl, sizeof taille_suppl, 1, fichier);
+  LECTURE_FICHIER input1 = lecture_fichier(argv[2]);
+  LECTURE_FICHIER input2 = lecture_fichier(argv[3]);
 
-  printf("s1 %f %f %f\n",origine.x,origine.y,origine.z);
-  printf("s2 %f %f %f\n",stations[0].x,stations[0].y,stations[0].z);
-
-
-  point = (POINT *) malloc(n * sizeof(POINT));
-  id = (unsigned *) malloc((n+3) * sizeof(unsigned));
-
-  for (i = 0; i < n; i++)
-  {  nb_lu = fread(point + i, sizeof(POINT), 1, fichier);
-     fseek(fichier, taille_suppl, SEEK_CUR);
+  if (input1.err == TRUE){
+    return EXIT_FAILURE;
   }
-  if (!nb_lu) return EXIT_FAILURE;
-  fclose(fichier);
+
+  n = input1.n;
+  origine = input1.origine;
+  point = input1.point;
+  id = input1.id;
+  phi = input1.phi;
+  theta = input1.theta;
+  nb_retenus = input1.nb_retenus;
 
   /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
-  nb_retenus = 0;
-  for (i = 0; i < n; i++)
-    if (dedans(point[i]))
-      id[nb_retenus++] = i;
-  id[nb_retenus] = nb_retenus;
-  id[nb_retenus+1] = nb_retenus+1;
-  id[nb_retenus+2] = nb_retenus+2;
 
-  phi = (int32_t *) malloc((nb_retenus+3) * sizeof(int32_t));
-  theta = (int32_t *) malloc((nb_retenus+3) * sizeof(int32_t));
-  for (i = 0; i < nb_retenus; i++)
-    calcule_phi_theta(origine, point[id[i]], phi+i, theta+i);
+  // param (point id origine n)
 
-  printf("%s lu\n", argv[1]);
-  printf("%d points lus en %f secondes\n", n, seconds(cpu));
-  printf("%d nb_retenus\n",nb_retenus);
+
+
+  // retourne phi theta nb_retenus id origine n point
 
   /*************** Construction de la triangulation  ***************/
 
-  arbre = (t_triangle*) malloc(nb_triangles_par_point*nb_retenus*sizeof(t_triangle));
+  //recois en param phi theta
 
-  if (!arbre)
-  { printf("pas assez de memoire\n"); return EXIT_FAILURE;}
+  OUTPUT_TRIANGULATION out_tri = triangulation(input1, LIMITE);
 
-  cpu = clock();
-  phi[nb_retenus]   = INT_MIN/2; theta[nb_retenus]   = INT_MIN/2;
-  phi[nb_retenus+1] = INT_MAX/2; theta[nb_retenus+1] = INT_MIN/2;
-  phi[nb_retenus+2] = 0;         theta[nb_retenus+2] = INT_MAX/2;
-  nb_triangles = construit_delaunay(nb_retenus, phi, theta, arbre);
-  printf("arbre de %d triangles construits en %f secondes\n",
-         nb_triangles, seconds(cpu));
+  if(out_tri.err==TRUE) {return EXIT_FAILURE;}
 
-  cpu = clock();
-  nb_triangles_finaux = 0;
+  arbre = out_tri.arbre;
+  nb_triangles = out_tri.nb_triangles;
+  nb_triangles_finaux = out_tri.nb_triangles_finaux;
 
-  for (i = 1; i < nb_triangles; i++)
-  {
-    if (arbre[i].final)file:///home/etienne/git_repos/3DTriangulationMultiAcquisition/output.ply
-
-      if (arbre[i].p1 < nb_retenus && arbre[i].p2 < nb_retenus &&
-          arbre[i].p3 < nb_retenus && distanceMax(point[arbre[i].p1],point[arbre[i].p2],point[arbre[i].p3])<LIMITE)
-        nb_triangles_finaux++;
-   }
-
-  printf("triangles finaux %d\n", nb_triangles_finaux);
+  // retourne arbre nb_triangles_finaux
 
   /***********Écriture de la triangulation au format ply ************/
   fichier = fopen(argv[argc-1], "wb");
@@ -672,7 +745,6 @@ int main(int argc, char* argv[])
            fwrite(&couleurs[1].y, 1, sizeof(unsigned char), fichier);
            fwrite(&couleurs[1].z, 1, sizeof(unsigned char), fichier);
          }
-
         }
     else
       ; // triangle extérieur à la scène
