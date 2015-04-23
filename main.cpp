@@ -671,6 +671,7 @@ int main(int argc, char* argv[])
   const double LIMITE = atof(argv[1]);
 
   /******************* lecture du fichier de données ************************/
+  /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
 
   unsigned i, n; // nombre total de points
   POINT origine; //Coordonnées de l'appareil de mesure
@@ -691,17 +692,8 @@ int main(int argc, char* argv[])
   theta = input1.theta;
   nb_retenus = input1.nb_retenus;
 
-  /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
-
-  // param (point id origine n)
-
-
-
-  // retourne phi theta nb_retenus id origine n point
 
   /*************** Construction de la triangulation  ***************/
-
-  //recois en param phi theta
 
   OUTPUT_TRIANGULATION out_tri = triangulation(input1, LIMITE);
 
@@ -710,8 +702,6 @@ int main(int argc, char* argv[])
   arbre = out_tri.arbre;
   nb_triangles = out_tri.nb_triangles;
   nb_triangles_finaux = out_tri.nb_triangles_finaux;
-
-  // retourne arbre nb_triangles_finaux
 
   /***********Écriture de la triangulation au format ply ************/
   fichier = fopen(argv[argc-1], "wb");
