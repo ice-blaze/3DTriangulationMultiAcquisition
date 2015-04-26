@@ -19,6 +19,8 @@ Compilation : gcc -Wall -O3 triangule_scan_ply.c -lm
 // Pour passer de coordonnées de type double en int32_t
 #define PRECISION 10000000
 
+const unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
+
 // Les points de mesure à prendre en considération seront à l'intérieur d'un
 // parallélipipède compris entre [(xmin, ymin, zmin), (xmax, ymax, zmax)]
 //double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
@@ -574,6 +576,7 @@ typedef struct {LECTURE_FICHIER inputs;
 
 OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
   OUTPUT_TRIANGULATION res;
+  res.inputs = in;
   res.err = TRUE;
 
   res.arbre = (t_triangle*) malloc(nb_triangles_par_point*in.nb_retenus*sizeof(t_triangle));
@@ -595,8 +598,7 @@ OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
 
   for (int i = 1; i < res.nb_triangles; i++)
   {
-    if (res.arbre[i].final)file:///home/etienne/git_repos/3DTriangulationMultiAcquisition/output.ply
-
+    if (res.arbre[i].final)
       if (res.arbre[i].p1 < in.nb_retenus && res.arbre[i].p2 < in.nb_retenus &&
           res.arbre[i].p3 < in.nb_retenus && distanceMax(in.point[res.arbre[i].p1],in.point[res.arbre[i].p2],in.point[res.arbre[i].p3])<LIMITE)
         res.nb_triangles_finaux++;
@@ -606,6 +608,51 @@ OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
 
   res.err = FALSE;
   return res;
+}
+
+void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGULATION in, POINT stations[], COULEUR couleurs[]){
+  clock_t cpu = clock();
+  FILE *fichier = fopen(output_path, "wb");
+  fprintf(fichier, "ply\nformat binary_little_endian 1.0\nelement vertex %d\n",
+          in.inputs.nb_retenus);
+  fprintf(fichier, "property double x\nproperty double y\nproperty double z\n");
+  fprintf(fichier, "element face %d\n", in.nb_triangles_finaux);
+  fprintf(fichier, "property list uchar int vertex_index\n");
+  fprintf(fichier, "property uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n");
+
+  for (int i = 0; i < in.inputs.nb_retenus; i++)
+    fwrite(in.inputs.point + in.inputs.id[i], 1, sizeof(POINT), fichier);
+
+  for (int i = 1; i < in.nb_triangles; i++)
+    if (in.arbre[i].final)
+      if (in.arbre[i].p1 >= in.inputs.n || in.arbre[i].p2 >= in.inputs.n || in.arbre[i].p3 >= in.inputs.n
+          || distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE)
+        ; // triangle fictif
+      else
+        {fwrite(&nb_cote_triangle, 1, sizeof(unsigned char), fichier);
+         fwrite(&in.arbre[i].p3, 1, sizeof(int), fichier);
+         fwrite(&in.arbre[i].p2, 1, sizeof(int), fichier);
+         fwrite(&in.arbre[i].p1, 1, sizeof(int), fichier);
+
+         /* attribut une couleur en fonction des stations qui peuvent la voir */ // TODO FAIRE DE MANIERE PROCEDURALE (masque de bit)
+         if(visible(in.inputs.origine,stations[0],in.inputs.point[in.arbre[i].p3],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p1])){
+           fwrite(&couleurs[0].x, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[0].y, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[0].z, 1, sizeof(unsigned char), fichier);
+         }else{
+           fwrite(&couleurs[1].x, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[1].y, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[1].z, 1, sizeof(unsigned char), fichier);
+         }
+        }
+    else
+      ; // triangle extérieur à la scène
+  fprintf(fichier, "\n");
+
+  fclose(fichier);
+
+  printf("Fichier %s de %d points et %d triangles ecrit en %f secondes\n",
+         output_path, in.inputs.nb_retenus, in.nb_triangles_finaux, seconds(cpu));
 }
 
 int main(int argc, char* argv[])
@@ -647,7 +694,6 @@ int main(int argc, char* argv[])
 
   clock_t cpu;
 
-  unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
   int nb_triangles; //nb triangles de la triangulation
   int nb_retenus;   //nb points dans le parallélipipède
   int nb_triangles_finaux; //nb triangles à afficher
@@ -703,46 +749,22 @@ int main(int argc, char* argv[])
   nb_triangles = out_tri.nb_triangles;
   nb_triangles_finaux = out_tri.nb_triangles_finaux;
 
+//  Marche à suivre
+//  triangulation que station 1
+//  triangulation que station 2
+// triangulation des deux stations
+
+  /*  Methode a implémenté
+   *  --------------------
+   *  extraire_les_points_visible_par_les_deux_station(...);
+   *  merge_deux_array_de_points(...);
+   *  faire triangulation
+   */
+
   /***********Écriture de la triangulation au format ply ************/
-  fichier = fopen(argv[argc-1], "wb");
-  fprintf(fichier, "ply\nformat binary_little_endian 1.0\nelement vertex %d\n",
-          nb_retenus);
-  fprintf(fichier, "property double x\nproperty double y\nproperty double z\n");
-  fprintf(fichier, "element face %d\n", nb_triangles_finaux);
-  fprintf(fichier, "property list uchar int vertex_index\n");
-  fprintf(fichier, "property uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n");
 
-  for (i = 0; i < nb_retenus; i++)
-    fwrite(point + id[i], 1, sizeof(POINT), fichier);
+  ecrire_fichier(argv[argc-1],LIMITE,out_tri,stations,couleurs);
 
-  for (i = 1; i < nb_triangles; i++)
-    if (arbre[i].final)
-      if (arbre[i].p1 >= n || arbre[i].p2 >= n || arbre[i].p3 >= n || distanceMax(point[arbre[i].p1],point[arbre[i].p2],point[arbre[i].p3])>=LIMITE)
-        ; // triangle fictif
-      else
-        {fwrite(&nb_cote_triangle, 1, sizeof(unsigned char), fichier);
-         fwrite(&arbre[i].p3, 1, sizeof(int), fichier);
-         fwrite(&arbre[i].p2, 1, sizeof(int), fichier);
-         fwrite(&arbre[i].p1, 1, sizeof(int), fichier);
-
-         /* attribut une couleur en fonction des stations qui peuvent la voir */ // TODO FAIRE DE MANIERE PROCEDURALE (masque de bit)
-         if(visible(origine,stations[0],point[arbre[i].p3],point[arbre[i].p2],point[arbre[i].p1])){
-           fwrite(&couleurs[0].x, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[0].y, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[0].z, 1, sizeof(unsigned char), fichier);
-         }else{
-           fwrite(&couleurs[1].x, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[1].y, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[1].z, 1, sizeof(unsigned char), fichier);
-         }
-        }
-    else
-      ; // triangle extérieur à la scène
-  fprintf(fichier, "\n");
-
-  fclose(fichier);
-  printf("Fichier %s de %d points et %d triangles ecrit en %f secondes\n",
-         argv[2], nb_retenus, nb_triangles_finaux, seconds(cpu));
   free(arbre);
   return EXIT_SUCCESS;
  }
