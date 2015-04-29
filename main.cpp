@@ -19,6 +19,11 @@ Compilation : gcc -Wall -O3 triangule_scan_ply.c -lm
 // Pour passer de coordonnées de type double en int32_t
 #define PRECISION 10000000
 
+#include <algorithm>
+#include <iostream>
+using namespace std;
+
+
 const unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
 
 // Les points de mesure à prendre en considération seront à l'intérieur d'un
@@ -28,7 +33,32 @@ double xmin = -10.0, xmax = 30.0,
        ymin = -20.0, ymax = 30.0,
        zmin = -10.0, zmax = 30.0;
 
-typedef struct {double x; double y; double z;} POINT;
+bool is_equal(double d1, double d2){
+  int i1 = d1*PRECISION;
+  int i2 = d2*PRECISION;
+  if(i1==i2) return true;
+  return false;
+}
+
+struct POINT {double x; double y; double z;
+  POINT() {}
+  POINT(double x, double y, double z) : x(x), y(y), z(z) {}
+  bool operator<(const POINT &o) const {
+    if (!is_equal(x,o.x)) { return x < o.x; }
+    if (!is_equal(y,o.y)) { return y < o.y; }
+    return z < o.z;
+  }
+  bool operator==(const POINT &o) const {
+    if (is_equal(x,o.x) && is_equal(y,o.y) && is_equal(z,o.z))
+      return true;
+    return false;
+  }
+  bool operator!=(const POINT &o) const {
+    if (is_equal(x,o.x) && is_equal(y,o.y) && is_equal(z,o.z))
+      return false;
+    return true;
+  }
+};
 typedef struct {unsigned char x; unsigned char y; unsigned char z;} COULEUR;
 
 const int FALSE = 0;
@@ -508,6 +538,57 @@ typedef struct {int n; POINT origine; POINT *point;
                 int nb_retenus;
                 int err;} LECTURE_FICHIER;
 
+LECTURE_FICHIER lecture_fichier(vector<POINT> vect, POINT origine){
+  int nb_lu;        //nb valeurs lues par fread
+  unsigned taille_suppl; //information supplémentaire pour chaque point
+
+  LECTURE_FICHIER res;//result
+  res.err = TRUE;
+
+  clock_t cpu = clock();
+
+  unsigned i, n; // nombre total de points
+  POINT *point;  //Coordonnées (x,y,z) de chaque point de mesure
+
+  n = vect.size();
+
+  point = (POINT *) malloc(n * sizeof(POINT));
+  res.id = (unsigned *) malloc((n+3) * sizeof(unsigned));
+
+  for (i = 0; i < n; i++)
+  {
+    point[i] = vect[i];
+  }
+
+  /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
+
+  int nb_retenus = 0;
+  for (i = 0; i < n; i++)
+    if (dedans(point[i])){
+      res.id[nb_retenus++] = i;
+    }
+  res.id[nb_retenus] = nb_retenus;
+  res.id[nb_retenus+1] = nb_retenus+1;
+  res.id[nb_retenus+2] = nb_retenus+2;
+
+  res.phi = (int32_t *) malloc((nb_retenus+3) * sizeof(int32_t));
+  res.theta = (int32_t *) malloc((nb_retenus+3) * sizeof(int32_t));
+  for (i = 0; i < nb_retenus; i++)
+    calcule_phi_theta(origine, point[res.id[i]], res.phi+i, res.theta+i);
+
+  printf("lecture d'un vector lu\n");
+  printf("%d points lus en %f secondes\n", n, seconds(cpu));
+  printf("%d nb_retenus\n",nb_retenus);
+
+  res.n = n;
+  res.origine = origine;
+  res.point = point;
+  res.nb_retenus = nb_retenus;
+  res.err = FALSE;
+
+  return res;
+}
+
 LECTURE_FICHIER lecture_fichier(char file_path[]){
   int nb_lu;        //nb valeurs lues par fread
   FILE *fichier;
@@ -557,7 +638,6 @@ LECTURE_FICHIER lecture_fichier(char file_path[]){
   printf("%s lu\n", file_path);
   printf("%d points lus en %f secondes\n", n, seconds(cpu));
   printf("%d nb_retenus\n",nb_retenus);
-
 
   res.n = n;
   res.origine = origine;
@@ -610,7 +690,7 @@ OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
   return res;
 }
 
-void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGULATION in, POINT stations[], COULEUR couleurs[]){
+void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGULATION in, COULEUR couleurs[], int couleurID){
   clock_t cpu = clock();
   FILE *fichier = fopen(output_path, "wb");
   fprintf(fichier, "ply\nformat binary_little_endian 1.0\nelement vertex %d\n",
@@ -635,15 +715,15 @@ void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGU
          fwrite(&in.arbre[i].p1, 1, sizeof(int), fichier);
 
          /* attribut une couleur en fonction des stations qui peuvent la voir */ // TODO FAIRE DE MANIERE PROCEDURALE (masque de bit)
-         if(visible(in.inputs.origine,stations[0],in.inputs.point[in.arbre[i].p3],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p1])){
-           fwrite(&couleurs[0].x, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[0].y, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[0].z, 1, sizeof(unsigned char), fichier);
-         }else{
-           fwrite(&couleurs[1].x, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[1].y, 1, sizeof(unsigned char), fichier);
-           fwrite(&couleurs[1].z, 1, sizeof(unsigned char), fichier);
-         }
+//         if(visible(in.inputs.origine,stations[0],in.inputs.point[in.arbre[i].p3],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p1])){
+           fwrite(&couleurs[couleurID].x, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[couleurID].y, 1, sizeof(unsigned char), fichier);
+           fwrite(&couleurs[couleurID].z, 1, sizeof(unsigned char), fichier);
+//         }else{
+//           fwrite(&couleurs[1].x, 1, sizeof(unsigned char), fichier);
+//           fwrite(&couleurs[1].y, 1, sizeof(unsigned char), fichier);
+//           fwrite(&couleurs[1].z, 1, sizeof(unsigned char), fichier);
+//         }
         }
     else
       ; // triangle extérieur à la scène
@@ -653,6 +733,80 @@ void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGU
 
   printf("Fichier %s de %d points et %d triangles ecrit en %f secondes\n",
          output_path, in.inputs.nb_retenus, in.nb_triangles_finaux, seconds(cpu));
+}
+
+// sort and remove duplicates
+vector<POINT> remove_duplicate(vector<POINT> vect){
+
+  sort(vect.begin(), vect.end());//n*log(n)
+
+  // remove duplicates
+  vector<POINT> result;
+  result.push_back(vect[0]);
+  for(int i=1;i<vect.size();i++){
+    if(vect.at(i)!=result.back()){
+      result.push_back(vect.at(i));
+    }
+  }
+  vect = result;
+  return result;
+}
+
+
+vector<POINT> points_visible_que_par_origine(const OUTPUT_TRIANGULATION in,const POINT station/*TODO tableau de toutes les autres stations*/, const double LIMITE){//in pour input
+  vector<POINT> resultat;
+
+  for (int i = 1; i < in.nb_triangles; i++)
+    if (in.arbre[i].final){
+      if (in.arbre[i].p1 >= in.inputs.n || in.arbre[i].p2 >= in.inputs.n || in.arbre[i].p3 >= in.inputs.n
+          || distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE)
+        ; // triangle fictif
+      else if(!visible(in.inputs.origine,station,
+                      in.inputs.point[in.arbre[i].p3],
+                      in.inputs.point[in.arbre[i].p2],
+                      in.inputs.point[in.arbre[i].p1])){
+          resultat.push_back(in.inputs.point[in.arbre[i].p1]);
+          resultat.push_back(in.inputs.point[in.arbre[i].p2]);
+          resultat.push_back(in.inputs.point[in.arbre[i].p3]);
+        }
+    }
+
+  return remove_duplicate(resultat);
+}
+
+//TODO retourne void, et ajouter en param le vector resultat
+vector<POINT> points_visible_par_station(const OUTPUT_TRIANGULATION in,const POINT station, const double LIMITE){//in pour input
+  vector<POINT> resultat;
+  for (int i = 1; i < in.nb_triangles; i++)
+    if (in.arbre[i].final){
+      if (in.arbre[i].p1 >= in.inputs.n || in.arbre[i].p2 >= in.inputs.n || in.arbre[i].p3 >= in.inputs.n
+          || distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE)
+        ; // triangle fictif
+      else if(visible(in.inputs.origine,station,
+                      in.inputs.point[in.arbre[i].p3],
+                      in.inputs.point[in.arbre[i].p2],
+                      in.inputs.point[in.arbre[i].p1])){
+          resultat.push_back(in.inputs.point[in.arbre[i].p1]);
+          resultat.push_back(in.inputs.point[in.arbre[i].p2]);
+          resultat.push_back(in.inputs.point[in.arbre[i].p3]);
+        }
+    }
+
+  return remove_duplicate(resultat);
+}
+
+vector<POINT> merge_vectors(vector<POINT> v1, vector<POINT> v2){
+  vector<POINT> result;
+
+  for(int i=0;i<v1.size();i++){
+    result.push_back(v1[i]);
+  }
+
+  for(int i=0;i<v2.size();i++){
+    result.push_back(v2[i]);
+  }
+
+  return remove_duplicate(result);
 }
 
 int main(int argc, char* argv[])
@@ -665,53 +819,19 @@ int main(int argc, char* argv[])
   couleurs[4].x=255; couleurs[4].y=0  ; couleurs[4].z=255;
   couleurs[5].x=255; couleurs[5].y=255; couleurs[5].z=0  ;
 
-
-  /*TEST
-//  POINT p1,p2,p3,p4,p5,p6,p7,p8;
-//  p1.x=0;p1.y=0;p1.z=0;
-//  p2.x=1;p2.y=0;p2.z=0;
-//  p3.x=0;p3.y=1;p3.z=0;
-//  p4.x=1;p4.y=1;p4.z=0;
-//  p5.x=0;p5.y=1;p5.z=1;
-//  p6.x=1;p6.y=1;p6.z=1;
-//  p7.x=0;p7.y=1;p7.z=1;
-//  p8.x=1;p8.y=0;p8.z=1;
-//
-//  POINT s1,s2,s3;
-//  s1.x=1;s1.y= 2;s1.z=1;
-//  s2.x=1;s2.y=-2;s2.z=100;
-//  s3.x=1;s3.y= 4;s3.z=1;
-//
-//  printf("s2 false?: %d \n",visible(s1,s2,p6,p4,p5));
-//  printf("s3 true?: %d \n",visible(s1,s3,p6,p4,p5));
-  /*TEST END*/
-
   if (!strcmp(argv[1],"-h"))
   {
     printf("usage: %s precision infile1.bin [infile2.bin ... infileN.bin] outfile.ply\n", argv[0]);
     return EXIT_FAILURE;
   }
 
-  clock_t cpu;
-
-  int nb_triangles; //nb triangles de la triangulation
-  int nb_retenus;   //nb points dans le parallélipipède
-  int nb_triangles_finaux; //nb triangles à afficher
-  int32_t* phi;            //azimuth de chaque point
-  int32_t* theta;          //élévation de chaque point
-  unsigned *id;            //identificateur des points retenus
-  t_triangle * arbre;      //noeuds de l'arborescence de la triangulation
-  FILE *fichier;
-
-  cpu = clock();
-
   /* récupérer les positions des stations */
   /*                                      */
   /*            DANGER  indices           */
   /*                                      */
-  POINT stations[argc-4];
-  for(int i=0;i<argc-/*3TODO*/4;i++){
-    stations[i] = extrait_station(argv[i+3]);
+  POINT stations[argc-3];
+  for(int i=0;i<argc-3;i++){
+    stations[i] = extrait_station(argv[i+2]);
     printf("1  %f %f %f\n",stations[i].x,stations[i].y,stations[i].z);
   }
   const double LIMITE = atof(argv[1]);
@@ -719,35 +839,60 @@ int main(int argc, char* argv[])
   /******************* lecture du fichier de données ************************/
   /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
 
-  unsigned i, n; // nombre total de points
-  POINT origine; //Coordonnées de l'appareil de mesure
-  POINT *point;  //Coordonnées (x,y,z) de chaque point de mesure
-
   LECTURE_FICHIER input1 = lecture_fichier(argv[2]);
   LECTURE_FICHIER input2 = lecture_fichier(argv[3]);
 
-  if (input1.err == TRUE){
-    return EXIT_FAILURE;
-  }
-
-  n = input1.n;
-  origine = input1.origine;
-  point = input1.point;
-  id = input1.id;
-  phi = input1.phi;
-  theta = input1.theta;
-  nb_retenus = input1.nb_retenus;
-
+  if (input1.err == TRUE){return EXIT_FAILURE;}
+  if (input2.err == TRUE){return EXIT_FAILURE;}
 
   /*************** Construction de la triangulation  ***************/
 
-  OUTPUT_TRIANGULATION out_tri = triangulation(input1, LIMITE);
+  OUTPUT_TRIANGULATION out_tri1 = triangulation(input1, LIMITE);
+  OUTPUT_TRIANGULATION out_tri2 = triangulation(input2, LIMITE);
 
-  if(out_tri.err==TRUE) {return EXIT_FAILURE;}
+  if(out_tri1.err==TRUE) {return EXIT_FAILURE;}
+  if(out_tri2.err==TRUE) {return EXIT_FAILURE;}
 
-  arbre = out_tri.arbre;
-  nb_triangles = out_tri.nb_triangles;
-  nb_triangles_finaux = out_tri.nb_triangles_finaux;
+  /*            TRIANGULATION DES DEUX STATIONS*/
+  vector<POINT> visi1=points_visible_par_station(out_tri1,stations[1],LIMITE);
+  vector<POINT> visi2=points_visible_par_station(out_tri2,stations[0],LIMITE);
+
+  vector<POINT> merged = merge_vectors(visi1,visi2);
+  visi1.clear();
+  visi2.clear();
+
+  LECTURE_FICHIER res1 = lecture_fichier(merged,stations[1]);
+  if (res1.err == TRUE){return EXIT_FAILURE;}
+  merged.clear();
+
+  OUTPUT_TRIANGULATION trires1 = triangulation(res1,LIMITE);
+  if(trires1.err==TRUE) {return EXIT_FAILURE;}
+
+  ecrire_fichier(argv[argc-1],LIMITE,trires1,couleurs,0);
+  //free output
+  /*   ----    FIN    ----   */
+
+  /* TRIANGULATION PURE STATION 1 */
+  vector<POINT> tri1=points_visible_que_par_origine(out_tri1,stations[1],LIMITE);
+  LECTURE_FICHIER aa1 = lecture_fichier(tri1,stations[0]);
+  if (aa1.err == TRUE){return EXIT_FAILURE;}
+  OUTPUT_TRIANGULATION aaa1 = triangulation(aa1,LIMITE);
+  if (aaa1.err == TRUE){return EXIT_FAILURE;}
+  ecrire_fichier("outputstation1.ply",LIMITE,aaa1,couleurs,1);//TODO output consctruction string avec ...
+  tri1.clear();
+  /*   ----    FIN    ----   */
+
+  /* TRIANGULATION PURE STATION 2 */
+  vector<POINT> tri2=points_visible_que_par_origine(out_tri2,stations[0],LIMITE);
+  LECTURE_FICHIER aa2 = lecture_fichier(tri2,stations[1]);
+  if (aa2.err == TRUE){return EXIT_FAILURE;}
+  OUTPUT_TRIANGULATION aaa2 = triangulation(aa2,LIMITE);
+  if (aaa2.err == TRUE){return EXIT_FAILURE;}
+  ecrire_fichier("outputstation2.ply",LIMITE,aaa2,couleurs,2);
+  tri2.clear();
+  /*   ----    FIN    ----   */
+
+
 
 //  Marche à suivre
 //  triangulation que station 1
@@ -763,9 +908,9 @@ int main(int argc, char* argv[])
 
   /***********Écriture de la triangulation au format ply ************/
 
-  ecrire_fichier(argv[argc-1],LIMITE,out_tri,stations,couleurs);
+//  ecrire_fichier(argv[argc-1],LIMITE,out_tri1,couleurs,0);
 
-  free(arbre);
+//  free(arbre);
   return EXIT_SUCCESS;
  }
 
