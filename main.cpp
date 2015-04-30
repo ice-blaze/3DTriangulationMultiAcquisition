@@ -864,30 +864,37 @@ int main(int argc, char* argv[])
   OUTPUT_TRIANGULATION out_tri1 = triangulation(input1, LIMITE);
   OUTPUT_TRIANGULATION out_tri2 = triangulation(input2, LIMITE);
 
+  free(out_tri1.inputs.id);
+  free(out_tri1.inputs.phi);
+  free(out_tri1.inputs.theta);
+  free(out_tri2.inputs.id);
+  free(out_tri2.inputs.phi);
+  free(out_tri2.inputs.theta);
+
   if(out_tri1.err==TRUE) {return EXIT_FAILURE;}
   if(out_tri2.err==TRUE) {return EXIT_FAILURE;}
 
   /* TRIANGULATION PURE STATION 1 */
   vector<POINT> tri1=points_visible_que_par_origine(out_tri1,stations[1],LIMITE);
 
-  LECTURE_FICHIER aa1 = lecture_fichier(tri1,stations[0]);
-  if (aa1.err == TRUE){return EXIT_FAILURE;}
-  OUTPUT_TRIANGULATION aaa1 = triangulation(aa1,LIMITE);
-  if (aaa1.err == TRUE){return EXIT_FAILURE;}
-  ecrire_fichier("outputstation1.ply",LIMITE,aaa1,couleurs,1);//TODO output consctruction string avec ...
+  LECTURE_FICHIER lf_station1 = lecture_fichier(tri1,stations[0]);
+  if (lf_station1.err == TRUE){return EXIT_FAILURE;}
+  OUTPUT_TRIANGULATION ot_station1 = triangulation(lf_station1,LIMITE);
+  if (ot_station1.err == TRUE){return EXIT_FAILURE;}
+  ecrire_fichier("outputstation1.ply",LIMITE,ot_station1,couleurs,1);//TODO output consctruction string avec ...
   clean_vector(tri1);
-  free_triangulation(aaa1);
+  free_triangulation(ot_station1);
   /*   ----    FIN    ----   */
 
   /* TRIANGULATION PURE STATION 2 */
   vector<POINT> tri2=points_visible_que_par_origine(out_tri2,stations[0],LIMITE);
-  LECTURE_FICHIER aa2 = lecture_fichier(tri2,stations[1]);
-  if (aa2.err == TRUE){return EXIT_FAILURE;}
-  OUTPUT_TRIANGULATION aaa2 = triangulation(aa2,LIMITE);
-  if (aaa2.err == TRUE){return EXIT_FAILURE;}
-  ecrire_fichier("outputstation2.ply",LIMITE,aaa2,couleurs,2);
+  LECTURE_FICHIER lf_station2 = lecture_fichier(tri2,stations[1]);
+  if (lf_station2.err == TRUE){return EXIT_FAILURE;}
+  OUTPUT_TRIANGULATION ot_station2 = triangulation(lf_station2,LIMITE);
+  if (ot_station2.err == TRUE){return EXIT_FAILURE;}
+  ecrire_fichier("outputstation2.ply",LIMITE,ot_station2,couleurs,2);
   clean_vector(tri2);
-  free_triangulation(aaa2);
+  free_triangulation(ot_station2);
   /*   ----    FIN    ----   */
 
   /*            TRIANGULATION DES DEUX STATIONS*/
@@ -898,14 +905,14 @@ int main(int argc, char* argv[])
   clean_vector(visi1);
   clean_vector(visi2);
 
-  LECTURE_FICHIER res1 = lecture_fichier(merged,stations[1]);
-  if (res1.err == TRUE){return EXIT_FAILURE;}
+  LECTURE_FICHIER lf_merge = lecture_fichier(merged,stations[1]);
+  if (lf_merge.err == TRUE){return EXIT_FAILURE;}
   clean_vector(merged);
 
-  OUTPUT_TRIANGULATION trires1 = triangulation(res1,LIMITE);
-  if(trires1.err==TRUE) {return EXIT_FAILURE;}
+  OUTPUT_TRIANGULATION ot_merge = triangulation(lf_merge,LIMITE);
+  if(ot_merge.err==TRUE) {return EXIT_FAILURE;}
 
-  ecrire_fichier(argv[argc-1],LIMITE,trires1,couleurs,0);
+  ecrire_fichier(argv[argc-1],LIMITE,ot_merge,couleurs,0);
   //free output
   /*   ----    FIN    ----   */
 
@@ -925,7 +932,6 @@ int main(int argc, char* argv[])
 
 //  ecrire_fichier(argv[argc-1],LIMITE,out_tri1,couleurs,0);
 
-//  free(arbre);
   return EXIT_SUCCESS;
  }
 
