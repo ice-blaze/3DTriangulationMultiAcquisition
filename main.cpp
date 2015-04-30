@@ -28,10 +28,10 @@ const unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
 
 // Les points de mesure à prendre en considération seront à l'intérieur d'un
 // parallélipipède compris entre [(xmin, ymin, zmin), (xmax, ymax, zmax)]
-//double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
-double xmin = -10.0, xmax = 30.0,
-       ymin = -20.0, ymax = 30.0,
-       zmin = -10.0, zmax = 30.0;
+double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
+//double xmin = -10.0, xmax = 30.0,
+//       ymin = -20.0, ymax = 30.0,
+//       zmin = -10.0, zmax = 30.0;
 
 bool is_equal(double d1, double d2){
   int i1 = d1*PRECISION;
@@ -57,6 +57,14 @@ struct POINT {double x; double y; double z;
     if (is_equal(x,o.x) && is_equal(y,o.y) && is_equal(z,o.z))
       return false;
     return true;
+  }
+  friend POINT operator+(POINT lhs, const POINT &o) {
+    lhs.x += o.x; lhs.y += o.y; lhs.z += o.z;
+    return lhs;
+  }
+  friend POINT operator/(POINT lhs, const double scalaire) {
+    lhs.x /= scalaire; lhs.y /= scalaire; lhs.z /= scalaire;
+    return lhs;
   }
 };
 typedef struct {unsigned char x; unsigned char y; unsigned char z;} COULEUR;
@@ -659,40 +667,53 @@ OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
   res.inputs = in;
   res.err = TRUE;
 
-  res.arbre = (t_triangle*) malloc(nb_triangles_par_point*in.nb_retenus*sizeof(t_triangle));
+  // pour que le code en dessous soit moins chargé
+  int nb_retenus = in.nb_retenus;
+  int32_t *phi = in.phi;
+  int32_t *theta = in.theta;
+  POINT* point = in.point;
+  t_triangle* arbre = res.arbre;
+
+  arbre = (t_triangle*) malloc(nb_triangles_par_point*nb_retenus*sizeof(t_triangle));
   //t_triangle * arbre = res.arbre; //peut être fait comme ça ? histoire d'éviter les res. voir les in.
 
-  if (!res.arbre)
+  if (!arbre)
   { printf("pas assez de memoire\n"); return res;}
 
   clock_t cpu = clock();
-  in.phi[in.nb_retenus]   = INT_MIN/2; in.theta[in.nb_retenus]   = INT_MIN/2;
-  in.phi[in.nb_retenus+1] = INT_MAX/2; in.theta[in.nb_retenus+1] = INT_MIN/2;
-  in.phi[in.nb_retenus+2] = 0;         in.theta[in.nb_retenus+2] = INT_MAX/2;
-  res.nb_triangles = construit_delaunay(in.nb_retenus, in.phi, in.theta, res.arbre);
+  phi[nb_retenus]   = INT_MIN/2; theta[nb_retenus]   = INT_MIN/2;
+  phi[nb_retenus+1] = INT_MAX/2; theta[nb_retenus+1] = INT_MIN/2;
+  phi[nb_retenus+2] = 0;         theta[nb_retenus+2] = INT_MAX/2;
+  res.nb_triangles = construit_delaunay(nb_retenus, phi, theta, arbre);
   printf("arbre de %d triangles construits en %f secondes\n",
          res.nb_triangles, seconds(cpu));
 
   cpu = clock();
-  res.nb_triangles_finaux = 0;
+  int nb_triangles_finaux = 0;
 
   for (int i = 1; i < res.nb_triangles; i++)
   {
-    if (res.arbre[i].final)
-      if (res.arbre[i].p1 < in.nb_retenus && res.arbre[i].p2 < in.nb_retenus &&
-          res.arbre[i].p3 < in.nb_retenus && distanceMax(in.point[res.arbre[i].p1],in.point[res.arbre[i].p2],in.point[res.arbre[i].p3])<LIMITE)
-        res.nb_triangles_finaux++;
+    if (arbre[i].final)
+      if (arbre[i].p1 < nb_retenus && arbre[i].p2 < nb_retenus &&
+          arbre[i].p3 < nb_retenus && distanceMax(point[arbre[i].p1],point[arbre[i].p2],point[arbre[i].p3])<LIMITE/**/){
+        nb_triangles_finaux++;
+      }
+      else {
+        arbre[i].final = FALSE;
+      }
    }
 
-  printf("triangles finaux %d\n", res.nb_triangles_finaux);
+  printf("triangles finaux %d\n", nb_triangles_finaux);
 
+  res.arbre = arbre;
+  res.nb_triangles_finaux = nb_triangles_finaux;
   res.err = FALSE;
   return res;
 }
 
-void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGULATION in, COULEUR couleurs[], int couleurID){
+void ecrire_fichier(const string output_path, const double LIMITE,OUTPUT_TRIANGULATION in, COULEUR couleurs[], int couleurID){
   clock_t cpu = clock();
-  FILE *fichier = fopen(output_path, "wb");
+  FILE *fichier = fopen(output_path.c_str(), "wb");
   fprintf(fichier, "ply\nformat binary_little_endian 1.0\nelement vertex %d\n",
           in.inputs.nb_retenus);
   fprintf(fichier, "property double x\nproperty double y\nproperty double z\n");
@@ -704,15 +725,15 @@ void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGU
     fwrite(in.inputs.point + in.inputs.id[i], 1, sizeof(POINT), fichier);
 
   for (int i = 1; i < in.nb_triangles; i++)
-    if (in.arbre[i].final)
-      if (in.arbre[i].p1 >= in.inputs.n || in.arbre[i].p2 >= in.inputs.n || in.arbre[i].p3 >= in.inputs.n
-          || distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE)
+    if (in.arbre[i].final)//TODO ?? pourquoi pas nb_retenu
+      if (in.arbre[i].p1 >= in.inputs.nb_retenus || in.arbre[i].p2 >= in.inputs.nb_retenus || in.arbre[i].p3 >= in.inputs.nb_retenus
+          /*|| distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE/**/)
         ; // triangle fictif
-      else
-        {fwrite(&nb_cote_triangle, 1, sizeof(unsigned char), fichier);
-         fwrite(&in.arbre[i].p3, 1, sizeof(int), fichier);
-         fwrite(&in.arbre[i].p2, 1, sizeof(int), fichier);
-         fwrite(&in.arbre[i].p1, 1, sizeof(int), fichier);
+      else{
+        fwrite(&nb_cote_triangle, 1, sizeof(unsigned char), fichier);
+        fwrite(&in.arbre[i].p3, 1, sizeof(int), fichier);
+        fwrite(&in.arbre[i].p2, 1, sizeof(int), fichier);
+        fwrite(&in.arbre[i].p1, 1, sizeof(int), fichier);
 
          /* attribut une couleur en fonction des stations qui peuvent la voir */ // TODO FAIRE DE MANIERE PROCEDURALE (masque de bit)
 //         if(visible(in.inputs.origine,stations[0],in.inputs.point[in.arbre[i].p3],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p1])){
@@ -732,11 +753,12 @@ void ecrire_fichier(const char output_path[], const double LIMITE,OUTPUT_TRIANGU
   fclose(fichier);
 
   printf("Fichier %s de %d points et %d triangles ecrit en %f secondes\n",
-         output_path, in.inputs.nb_retenus, in.nb_triangles_finaux, seconds(cpu));
+         output_path.c_str(), in.inputs.nb_retenus, in.nb_triangles_finaux, seconds(cpu));
 }
 
+
 // sort and remove duplicates
-vector<POINT> remove_duplicate(vector<POINT> vect){
+void remove_duplicate(vector<POINT> &vect){
 
   sort(vect.begin(), vect.end());//n*log(n)
 
@@ -748,18 +770,43 @@ vector<POINT> remove_duplicate(vector<POINT> vect){
       result.push_back(vect.at(i));
     }
   }
-  vect = result;
-  return result;
+  vect.clear();
+  vect.insert(vect.end(), result.begin(), result.end());
 }
 
-
-vector<POINT> points_visible_que_par_origine(const OUTPUT_TRIANGULATION in,const POINT station/*TODO tableau de toutes les autres stations*/, const double LIMITE){//in pour input
-  vector<POINT> resultat;
+void visible_point(vector<POINT> &only_station,vector<POINT> &only_other,const OUTPUT_TRIANGULATION in,const POINT station/*TODO tableau de toutes les autres stations*/, const double LIMITE){//in pour input
 
   for (int i = 1; i < in.nb_triangles; i++)
     if (in.arbre[i].final){
-      if (in.arbre[i].p1 >= in.inputs.n || in.arbre[i].p2 >= in.inputs.n || in.arbre[i].p3 >= in.inputs.n
-          || distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE)
+      if (in.arbre[i].p1 >= in.inputs.nb_retenus || in.arbre[i].p2 >= in.inputs.nb_retenus || in.arbre[i].p3 >= in.inputs.nb_retenus
+          /*|| distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE/**/)
+        ; // triangle fictif
+      else {
+        if(!visible(in.inputs.origine,station,
+                      in.inputs.point[in.arbre[i].p3],
+                      in.inputs.point[in.arbre[i].p2],
+                      in.inputs.point[in.arbre[i].p1])){
+          only_other.push_back(in.inputs.point[in.arbre[i].p1]);
+          only_other.push_back(in.inputs.point[in.arbre[i].p2]);
+          only_other.push_back(in.inputs.point[in.arbre[i].p3]);
+        } else {
+          only_station.push_back(in.inputs.point[in.arbre[i].p1]);
+          only_station.push_back(in.inputs.point[in.arbre[i].p2]);
+          only_station.push_back(in.inputs.point[in.arbre[i].p3]);
+        }
+      }
+    }
+
+  remove_duplicate(only_station);
+  remove_duplicate(only_other);
+}
+
+void points_visible_que_par_origine(vector<POINT> &resultat, const OUTPUT_TRIANGULATION in,const POINT station/*TODO tableau de toutes les autres stations*/, const double LIMITE){//in pour input
+
+  for (int i = 1; i < in.nb_triangles; i++)
+    if (in.arbre[i].final){
+      if (in.arbre[i].p1 >= in.inputs.nb_retenus || in.arbre[i].p2 >= in.inputs.nb_retenus || in.arbre[i].p3 >= in.inputs.nb_retenus
+          /*|| distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE/**/)
         ; // triangle fictif
       else if(!visible(in.inputs.origine,station,
                       in.inputs.point[in.arbre[i].p3],
@@ -771,16 +818,14 @@ vector<POINT> points_visible_que_par_origine(const OUTPUT_TRIANGULATION in,const
         }
     }
 
-  return remove_duplicate(resultat);
+  remove_duplicate(resultat);
 }
 
-//TODO retourne void, et ajouter en param le vector resultat
-vector<POINT> points_visible_par_station(const OUTPUT_TRIANGULATION in,const POINT station, const double LIMITE){//in pour input
-  vector<POINT> resultat;
+void points_visible_par_station(vector<POINT> &resultat, const OUTPUT_TRIANGULATION in,const POINT station, const double LIMITE){//in pour input
   for (int i = 1; i < in.nb_triangles; i++)
     if (in.arbre[i].final){
-      if (in.arbre[i].p1 >= in.inputs.n || in.arbre[i].p2 >= in.inputs.n || in.arbre[i].p3 >= in.inputs.n
-          || distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE)
+      if (in.arbre[i].p1 >= in.inputs.nb_retenus || in.arbre[i].p2 >= in.inputs.nb_retenus || in.arbre[i].p3 >= in.inputs.nb_retenus
+          /*|| distanceMax(in.inputs.point[in.arbre[i].p1],in.inputs.point[in.arbre[i].p2],in.inputs.point[in.arbre[i].p3])>=LIMITE/**/)
         ; // triangle fictif
       else if(visible(in.inputs.origine,station,
                       in.inputs.point[in.arbre[i].p3],
@@ -792,7 +837,7 @@ vector<POINT> points_visible_par_station(const OUTPUT_TRIANGULATION in,const POI
         }
     }
 
-  return remove_duplicate(resultat);
+  remove_duplicate(resultat);
 }
 
 vector<POINT> merge_vectors(vector<POINT> v1, vector<POINT> v2){
@@ -806,21 +851,31 @@ vector<POINT> merge_vectors(vector<POINT> v1, vector<POINT> v2){
     result.push_back(v2[i]);
   }
 
-  return remove_duplicate(result);
+  remove_duplicate(result);
+  return result;
 }
 
-void free_triangulation(OUTPUT_TRIANGULATION out){
- free(out.arbre);
- free(out.inputs.id);
- free(out.inputs.point);
- free(out.inputs.phi);
- free(out.inputs.theta);
+void free_triangulation_partial(OUTPUT_TRIANGULATION out){
+  free(out.inputs.id);
+  free(out.inputs.phi);
+  free(out.inputs.theta);
+}
+
+void free_triangulation_complete(OUTPUT_TRIANGULATION out){
+  free_triangulation_partial(out);
+  free(out.arbre);
+  free(out.inputs.point);
 }
 
 template <typename T>
 void clean_vector(vector<T> _v){
   _v.clear();
   _v.shrink_to_fit();
+}
+
+/* DEBUG */
+void print(POINT p){
+  cout << "point : " << p.x << " " << p.y << " " << p.z << endl;
 }
 
 int main(int argc, char* argv[])
@@ -835,7 +890,7 @@ int main(int argc, char* argv[])
 
   if (!strcmp(argv[1],"-h"))
   {
-    printf("usage: %s precision infile1.bin [infile2.bin ... infileN.bin] outfile.ply\n", argv[0]);
+    printf("usage: %s precision infile1.bin [infile2.bin ... infileN.bin] outfileprefix\n", argv[0]);
     return EXIT_FAILURE;
   }
 
@@ -846,9 +901,10 @@ int main(int argc, char* argv[])
   POINT stations[argc-3];
   for(int i=0;i<argc-3;i++){
     stations[i] = extrait_station(argv[i+2]);
-    printf("1  %f %f %f\n",stations[i].x,stations[i].y,stations[i].z);
+//    printf("1  %f %f %f\n",stations[i].x,stations[i].y,stations[i].z);
   }
-  const double LIMITE = atof(argv[1]);
+  double LIMITE = atof(argv[1]);
+  string output_name(argv[argc-1]);
 
   /******************* lecture du fichier de données ************************/
   /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
@@ -864,55 +920,61 @@ int main(int argc, char* argv[])
   OUTPUT_TRIANGULATION out_tri1 = triangulation(input1, LIMITE);
   OUTPUT_TRIANGULATION out_tri2 = triangulation(input2, LIMITE);
 
-  free(out_tri1.inputs.id);
-  free(out_tri1.inputs.phi);
-  free(out_tri1.inputs.theta);
-  free(out_tri2.inputs.id);
-  free(out_tri2.inputs.phi);
-  free(out_tri2.inputs.theta);
+  free_triangulation_partial(out_tri1);
+  free_triangulation_partial(out_tri2);
+
 
   if(out_tri1.err==TRUE) {return EXIT_FAILURE;}
   if(out_tri2.err==TRUE) {return EXIT_FAILURE;}
 
   /* TRIANGULATION PURE STATION 1 */
-  vector<POINT> tri1=points_visible_que_par_origine(out_tri1,stations[1],LIMITE);
+  //dont the triangulation correctly
+//  vector<POINT> tri1,tri2,visi1,visi2;
+//  visible_point(tri1,visi1,out_tri1,stations[1],LIMITE);
+
+  vector<POINT> tri1;
+  points_visible_que_par_origine(tri1,out_tri1,stations[1],LIMITE);
 
   LECTURE_FICHIER lf_station1 = lecture_fichier(tri1,stations[0]);
   if (lf_station1.err == TRUE){return EXIT_FAILURE;}
   OUTPUT_TRIANGULATION ot_station1 = triangulation(lf_station1,LIMITE);
   if (ot_station1.err == TRUE){return EXIT_FAILURE;}
-  ecrire_fichier("outputstation1.ply",LIMITE,ot_station1,couleurs,1);//TODO output consctruction string avec ...
+  ecrire_fichier(output_name+"station1.ply",LIMITE,ot_station1,couleurs,1);
   clean_vector(tri1);
-  free_triangulation(ot_station1);
+  free_triangulation_complete(ot_station1);
   /*   ----    FIN    ----   */
 
   /* TRIANGULATION PURE STATION 2 */
-  vector<POINT> tri2=points_visible_que_par_origine(out_tri2,stations[0],LIMITE);
+  // //visible_point(tri2,visi2,out_tri2,stations[0],LIMITE);
+  vector<POINT> tri2;
+  points_visible_que_par_origine(tri2,out_tri2,stations[0],LIMITE);
   LECTURE_FICHIER lf_station2 = lecture_fichier(tri2,stations[1]);
   if (lf_station2.err == TRUE){return EXIT_FAILURE;}
   OUTPUT_TRIANGULATION ot_station2 = triangulation(lf_station2,LIMITE);
   if (ot_station2.err == TRUE){return EXIT_FAILURE;}
-  ecrire_fichier("outputstation2.ply",LIMITE,ot_station2,couleurs,2);
+  ecrire_fichier(output_name+"station2.ply",LIMITE,ot_station2,couleurs,2);
   clean_vector(tri2);
-  free_triangulation(ot_station2);
+  free_triangulation_complete(ot_station2);
   /*   ----    FIN    ----   */
 
   /*            TRIANGULATION DES DEUX STATIONS*/
-  vector<POINT> visi1=points_visible_par_station(out_tri1,stations[1],LIMITE);
-  vector<POINT> visi2=points_visible_par_station(out_tri2,stations[0],LIMITE);
+  vector<POINT> visi1;
+  points_visible_par_station(visi1,out_tri1,stations[1],LIMITE);
+  vector<POINT> visi2;
+  points_visible_par_station(visi2,out_tri2,stations[0],LIMITE);
 
   vector<POINT> merged = merge_vectors(visi1,visi2);
   clean_vector(visi1);
   clean_vector(visi2);
 
-  LECTURE_FICHIER lf_merge = lecture_fichier(merged,stations[1]);
+  LECTURE_FICHIER lf_merge = lecture_fichier(merged,/*(stations[1]+stations[0])/2/**/stations[0]/**/);//point de gravité
   if (lf_merge.err == TRUE){return EXIT_FAILURE;}
   clean_vector(merged);
 
   OUTPUT_TRIANGULATION ot_merge = triangulation(lf_merge,LIMITE);
   if(ot_merge.err==TRUE) {return EXIT_FAILURE;}
 
-  ecrire_fichier(argv[argc-1],LIMITE,ot_merge,couleurs,0);
+  ecrire_fichier(output_name+"merge.ply",LIMITE,ot_merge,couleurs,0);
   //free output
   /*   ----    FIN    ----   */
 
