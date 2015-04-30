@@ -809,6 +809,14 @@ vector<POINT> merge_vectors(vector<POINT> v1, vector<POINT> v2){
   return remove_duplicate(result);
 }
 
+void free_triangulation(OUTPUT_TRIANGULATION out){
+ free(out.arbre);
+ free(out.inputs.id);
+ free(out.inputs.point);
+ free(out.inputs.phi);
+ free(out.inputs.theta);
+}
+
 int main(int argc, char* argv[])
 {
   COULEUR couleurs[6];
@@ -853,33 +861,17 @@ int main(int argc, char* argv[])
   if(out_tri1.err==TRUE) {return EXIT_FAILURE;}
   if(out_tri2.err==TRUE) {return EXIT_FAILURE;}
 
-  /*            TRIANGULATION DES DEUX STATIONS*/
-  vector<POINT> visi1=points_visible_par_station(out_tri1,stations[1],LIMITE);
-  vector<POINT> visi2=points_visible_par_station(out_tri2,stations[0],LIMITE);
-
-  vector<POINT> merged = merge_vectors(visi1,visi2);
-  visi1.clear();
-  visi2.clear();
-
-  LECTURE_FICHIER res1 = lecture_fichier(merged,stations[1]);
-  if (res1.err == TRUE){return EXIT_FAILURE;}
-  merged.clear();
-
-  OUTPUT_TRIANGULATION trires1 = triangulation(res1,LIMITE);
-  if(trires1.err==TRUE) {return EXIT_FAILURE;}
-
-  ecrire_fichier(argv[argc-1],LIMITE,trires1,couleurs,0);
-  //free output
-  /*   ----    FIN    ----   */
-
   /* TRIANGULATION PURE STATION 1 */
   vector<POINT> tri1=points_visible_que_par_origine(out_tri1,stations[1],LIMITE);
+
   LECTURE_FICHIER aa1 = lecture_fichier(tri1,stations[0]);
   if (aa1.err == TRUE){return EXIT_FAILURE;}
   OUTPUT_TRIANGULATION aaa1 = triangulation(aa1,LIMITE);
   if (aaa1.err == TRUE){return EXIT_FAILURE;}
   ecrire_fichier("outputstation1.ply",LIMITE,aaa1,couleurs,1);//TODO output consctruction string avec ...
   tri1.clear();
+  tri1.shrink_to_fit();
+  free_triangulation(aaa1);
   /*   ----    FIN    ----   */
 
   /* TRIANGULATION PURE STATION 2 */
@@ -890,9 +882,31 @@ int main(int argc, char* argv[])
   if (aaa2.err == TRUE){return EXIT_FAILURE;}
   ecrire_fichier("outputstation2.ply",LIMITE,aaa2,couleurs,2);
   tri2.clear();
+  tri2.shrink_to_fit();
+  free_triangulation(aaa2);
   /*   ----    FIN    ----   */
 
+  /*            TRIANGULATION DES DEUX STATIONS*/
+  vector<POINT> visi1=points_visible_par_station(out_tri1,stations[1],LIMITE);
+  vector<POINT> visi2=points_visible_par_station(out_tri2,stations[0],LIMITE);
 
+  vector<POINT> merged = merge_vectors(visi1,visi2);
+  visi1.clear();
+  visi2.clear();
+  visi1.shrink_to_fit();
+  visi2.shrink_to_fit();
+
+  LECTURE_FICHIER res1 = lecture_fichier(merged,stations[1]);
+  if (res1.err == TRUE){return EXIT_FAILURE;}
+  merged.clear();
+  merged.shrink_to_fit();
+
+  OUTPUT_TRIANGULATION trires1 = triangulation(res1,LIMITE);
+  if(trires1.err==TRUE) {return EXIT_FAILURE;}
+
+  ecrire_fichier(argv[argc-1],LIMITE,trires1,couleurs,0);
+  //free output
+  /*   ----    FIN    ----   */
 
 //  Marche à suivre
 //  triangulation que station 1
