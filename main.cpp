@@ -817,7 +817,8 @@ void free_triangulation(OUTPUT_TRIANGULATION out){
  free(out.inputs.theta);
 }
 
-void clean_vector(vector<POINT> _v){
+template <typename T>
+void clean_vector(vector<T> _v){
   _v.clear();
   _v.shrink_to_fit();
 }
