@@ -904,18 +904,18 @@ void set_station_on_points(const OUTPUT_TRIANGULATION in,const POINT stations[],
     }
 */
 void get_points_by_mask(vector<POINT> &resultat, const OUTPUT_TRIANGULATION in,const unsigned int mask){//in pour input
-  int sum= 0;
+//  int sum= 0;
   for (int i = 0; i < in.inputs.nb_retenus; i++){
-      if(in.inputs.point[i].stations == 0){
-        ++sum;
-      }
+//      if(in.inputs.point[i].stations == 0){
+//        ++sum;
+//      }
     if(in.inputs.point[i].stations == mask){
       resultat.push_back(in.inputs.point[i]);
     }
   }
-  printf("---------a\n");
-  printf("%d \n",sum);
-  printf("---------a\n");
+//  printf("---------a\n");
+//  printf("%d \n",sum);
+//  printf("---------a\n");
 }
 
 void get_points_by_allmask(map<unsigned int,vector<POINT>> &resultat, const OUTPUT_TRIANGULATION in){//in pour input
@@ -933,11 +933,11 @@ void get_points_by_allmask(map<unsigned int,vector<POINT>> &resultat, const OUTP
   for (int i = 0; i < in.inputs.nb_retenus; i++){
       //create vector with the mask if not exist (hashmap is the best)
       //then go trough all points and add them to the right vector
-      if(in.inputs.point[i].stations==0){
-        printf("-------------\n");
-        printf("%d \n",i);
-        printf("-------------\n");
-      }
+//      if(in.inputs.point[i].stations==0){
+//        printf("-------------\n");
+//        printf("%d \n",i);
+//        printf("-------------\n");
+//      }
 
       resultat[in.inputs.point[i].stations].push_back(in.inputs.point[i]);
 //    if(in.inputs.point[i].stations == mask){
@@ -1046,12 +1046,12 @@ int main(int argc, char* argv[])
   if (input2.err == TRUE){return EXIT_FAILURE;}
   if(out_tri2.err==TRUE) {return EXIT_FAILURE;}
 
+  /* TRIANGULATION GENERALISÉ */
   map<unsigned int,vector<POINT>> test;
   get_points_by_allmask(test,out_tri1);
 //  deb_sizes(test);
   get_points_by_allmask(test,out_tri2);
-
-  deb_sizes(test);
+//  deb_sizes(test);
   printf("%d \n",out_tri1.inputs.nb_retenus+out_tri2.inputs.nb_retenus);
   for(map<unsigned int,vector<POINT>>::iterator iter = test.begin(); iter != test.end(); ++iter){
     unsigned int k =  iter->first;
@@ -1060,10 +1060,7 @@ int main(int argc, char* argv[])
     }
 
     int station = -1;
-    do{
-      station++;
-//      printf("check : %d, station: %d, k : %d\n",k&pow2(station),station,k);
-    }while(k&pow2(station)) ;//TODO simplifié ?
+    while(k&pow2(++station)) {};
 //    return 0;
 //    printf("%d \n",station);
 //    return 0;
@@ -1079,7 +1076,7 @@ int main(int argc, char* argv[])
     clean_vector(test[k]);
     free_triangulation_complete(ot_station1);
   }
-//  return 0;
+  return 0;
 
   /* TRIANGULATION PURE STATION 1 */
   //dont the triangulation correctly
