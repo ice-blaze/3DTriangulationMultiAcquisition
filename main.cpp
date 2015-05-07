@@ -28,10 +28,10 @@ const unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
 
 // Les points de mesure à prendre en considération seront à l'intérieur d'un
 // parallélipipède compris entre [(xmin, ymin, zmin), (xmax, ymax, zmax)]
-//double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
-double xmin = -10.0, xmax = 30.0,
-       ymin = -20.0, ymax = 30.0,
-       zmin = -10.0, zmax = 30.0;
+double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
+//double xmin = -10.0, xmax = 30.0,
+//       ymin = -20.0, ymax = 30.0,
+//       zmin = -10.0, zmax = 30.0;
 
 bool is_equal(double d1, double d2){
   int i1 = d1*PRECISION;
@@ -578,9 +578,9 @@ LECTURE_FICHIER lecture_fichier(vector<POINT> vect, POINT origine){
 
   int nb_retenus = 0;
   for (i = 0; i < n; i++)
-    if (dedans(point[i])){
+//    if (dedans(point[i])){
       res.id[nb_retenus++] = i;
-    }
+//    }
   res.id[nb_retenus] = nb_retenus;
   res.id[nb_retenus+1] = nb_retenus+1;
   res.id[nb_retenus+2] = nb_retenus+2;
@@ -628,12 +628,18 @@ LECTURE_FICHIER lecture_fichier(char file_path[]){
   point = (POINT *) malloc(n * sizeof(POINT));
   res.id = (unsigned *) malloc((n+3) * sizeof(unsigned));
 
+  int nb_retenus = 0;
+  POINT temp;
   for (i = 0; i < n; i++)
   {
+
 //    nb_lu = fread(point + i, sizeof(POINT), 1, fichier);
-    nb_lu = fread(&point[i].x, sizeof(point[i].x), 1, fichier);
-    nb_lu = fread(&point[i].y, sizeof(point[i].y), 1, fichier);
-    nb_lu = fread(&point[i].z, sizeof(point[i].z), 1, fichier);
+    nb_lu = fread(&temp.x, sizeof(temp.x), 1, fichier);
+    nb_lu = fread(&temp.y, sizeof(temp.y), 1, fichier);
+    nb_lu = fread(&temp.z, sizeof(temp.z), 1, fichier);
+    if (dedans(temp)){
+      point[nb_retenus++] = temp;
+    }
     fseek(fichier, taille_suppl, SEEK_CUR);
   }
   if (!nb_lu) {return res;}
@@ -641,11 +647,13 @@ LECTURE_FICHIER lecture_fichier(char file_path[]){
 
   /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
 
-  int nb_retenus = 0;
-  for (i = 0; i < n; i++)
-    if (dedans(point[i])){
-      res.id[nb_retenus++] = i;
-    }
+
+//  for (i = 0; i < n; i++)
+  for (i = 0; i < nb_retenus; i++)
+//    if (dedans(point[i])){
+//      res.id[nb_retenus++] = i;
+      res.id[i] = i;
+//    }
   res.id[nb_retenus] = nb_retenus;
   res.id[nb_retenus+1] = nb_retenus+1;
   res.id[nb_retenus+2] = nb_retenus+2;
