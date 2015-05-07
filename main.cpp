@@ -19,6 +19,7 @@ Compilation : gcc -Wall -O3 triangule_scan_ply.c -lm
 // Pour passer de coordonnées de type double en int32_t
 #define PRECISION 10000000
 
+#include <map>
 #include <algorithm>
 #include <iostream>
 using namespace std;
@@ -73,6 +74,10 @@ typedef struct {unsigned char x; unsigned char y; unsigned char z;} COULEUR;
 
 int pow2( unsigned int pwr ) {
    return 1 << pwr;
+}
+
+bool isPow2 (unsigned int x){
+  return ((x != 0) && ((x & (~x + 1)) == x));
 }
 
 const int FALSE = 0;
@@ -569,6 +574,7 @@ LECTURE_FICHIER lecture_fichier(vector<POINT> vect, POINT origine){
   point = (POINT *) malloc(n * sizeof(POINT));
   res.id = (unsigned *) malloc((n+3) * sizeof(unsigned));
 
+  // attention, dans la version avec fichier en param, on ne prend que les points dans une certaine zone
   for (i = 0; i < n; i++)
   {
     point[i] = vect[i];
@@ -637,6 +643,7 @@ LECTURE_FICHIER lecture_fichier(char file_path[]){
     nb_lu = fread(&temp.x, sizeof(temp.x), 1, fichier);
     nb_lu = fread(&temp.y, sizeof(temp.y), 1, fichier);
     nb_lu = fread(&temp.z, sizeof(temp.z), 1, fichier);
+    //TODO pas la meilleur façon de faire, tableau ID surement inutile. Mieux comprendre l'algo pour supprimer le tableau d'ID
     if (dedans(temp)){
       point[nb_retenus++] = temp;
     }
@@ -897,10 +904,45 @@ void set_station_on_points(const OUTPUT_TRIANGULATION in,const POINT stations[],
     }
 */
 void get_points_by_mask(vector<POINT> &resultat, const OUTPUT_TRIANGULATION in,const unsigned int mask){//in pour input
+  int sum= 0;
   for (int i = 0; i < in.inputs.nb_retenus; i++){
+      if(in.inputs.point[i].stations == 0){
+        ++sum;
+      }
     if(in.inputs.point[i].stations == mask){
       resultat.push_back(in.inputs.point[i]);
     }
+  }
+  printf("---------a\n");
+  printf("%d \n",sum);
+  printf("---------a\n");
+}
+
+void get_points_by_allmask(map<unsigned int,vector<POINT>> &resultat, const OUTPUT_TRIANGULATION in){//in pour input
+//  for (int i = 0; i < nb_stations; i++){
+//    vector<POINT> temp;
+//    temp.push_back(POINT(1,2,3));
+//    temp.push_back(POINT(1,2,3));
+//    temp.push_back(POINT(1,2,3));
+//    resultat.push_back(temp);
+//  }
+//
+//  printf("\nsize temp %d\n", resultat.size());
+
+
+  for (int i = 0; i < in.inputs.nb_retenus; i++){
+      //create vector with the mask if not exist (hashmap is the best)
+      //then go trough all points and add them to the right vector
+      if(in.inputs.point[i].stations==0){
+        printf("-------------\n");
+        printf("%d \n",i);
+        printf("-------------\n");
+      }
+
+      resultat[in.inputs.point[i].stations].push_back(in.inputs.point[i]);
+//    if(in.inputs.point[i].stations == mask){
+//      resultat.push_back(in.inputs.point[i]);
+//    }
   }
 }
 
@@ -935,6 +977,17 @@ template <typename T>
 void clean_vector(vector<T> _v){
   _v.clear();
   _v.shrink_to_fit();
+}
+
+/*debug*/
+void deb_sizes(map<unsigned int,vector<POINT>> _map){
+  printf("\n nombre de vector : %d\n",_map.size());
+  for(map<unsigned int,vector<POINT>>::iterator iter = _map.begin(); iter != _map.end(); ++iter){
+    unsigned int k =  iter->first;
+
+    printf("vect %d -> size : %d\n",k,_map[k].size());
+  }
+  printf("------------");
 }
 
 int main(int argc, char* argv[])
@@ -993,13 +1046,49 @@ int main(int argc, char* argv[])
   if (input2.err == TRUE){return EXIT_FAILURE;}
   if(out_tri2.err==TRUE) {return EXIT_FAILURE;}
 
+  map<unsigned int,vector<POINT>> test;
+  get_points_by_allmask(test,out_tri1);
+//  deb_sizes(test);
+  get_points_by_allmask(test,out_tri2);
+
+  deb_sizes(test);
+  printf("%d \n",out_tri1.inputs.nb_retenus+out_tri2.inputs.nb_retenus);
+  for(map<unsigned int,vector<POINT>>::iterator iter = test.begin(); iter != test.end(); ++iter){
+    unsigned int k =  iter->first;
+    if(k == 0){ //TODO pourquoi il y a des points qui ne sont vu par personne ?
+      continue;
+    }
+
+    int station = -1;
+    do{
+      station++;
+//      printf("check : %d, station: %d, k : %d\n",k&pow2(station),station,k);
+    }while(k&pow2(station)) ;//TODO simplifié ?
+//    return 0;
+//    printf("%d \n",station);
+//    return 0;
+    // station unique si seulement 1 bit existe
+    // sinon une des stations selectionné
+    LECTURE_FICHIER lf_station1 = lecture_fichier(test[k],stations[station]);
+    if (lf_station1.err == TRUE){return EXIT_FAILURE;}
+    // si une seule station LIMITE 1
+    // si plusieur station, une des stations donc LIMITE2
+    OUTPUT_TRIANGULATION ot_station1 = triangulation(lf_station1,(isPow2(k))?LIMITE1:LIMITE2);
+    if (ot_station1.err == TRUE){return EXIT_FAILURE;}
+    ecrire_fichier(output_name+to_string(k)+".ply",ot_station1,couleurs,k);//TODO afficher le nombre en binaire
+    clean_vector(test[k]);
+    free_triangulation_complete(ot_station1);
+  }
+//  return 0;
 
   /* TRIANGULATION PURE STATION 1 */
   //dont the triangulation correctly
 //  vector<POINT> tri1,tri2,visi1,visi2;
 //  visible_point(tri1,visi1,out_tri1,stations[1],LIMITE);
+  int sum = 0;
   vector<POINT> tri1;
   get_points_by_mask(tri1,out_tri1,pow2(0));
+  sum += tri1.size();
 //  points_visible_que_par_origine(tri1,out_tri1,stations[1],LIMITE);
 
   LECTURE_FICHIER lf_station1 = lecture_fichier(tri1,stations[0]);
@@ -1015,6 +1104,7 @@ int main(int argc, char* argv[])
   // //visible_point(tri2,visi2,out_tri2,stations[0],LIMITE);
   vector<POINT> tri2;
   get_points_by_mask(tri2,out_tri2,pow2(1));
+  sum += tri2.size();
 //  points_visible_que_par_origine(tri2,out_tri2,stations[0],LIMITE);
   LECTURE_FICHIER lf_station2 = lecture_fichier(tri2,stations[1]);
   if (lf_station2.err == TRUE){return EXIT_FAILURE;}
@@ -1030,8 +1120,11 @@ int main(int argc, char* argv[])
   get_points_by_mask(visi1,out_tri1,pow2(0)+pow2(1));
 //  points_visible_par_station(visi1,out_tri1,stations[1],LIMITE);
   vector<POINT> visi2;
-  get_points_by_mask(visi2,out_tri1,pow2(0)+pow2(1));
+  get_points_by_mask(visi2,out_tri2,pow2(0)+pow2(1));
 //  points_visible_par_station(visi2,out_tri2,stations[0],LIMITE);
+  sum += visi1.size();
+  sum += visi2.size();
+  printf("somme : %d\n",sum);
 
   vector<POINT> merged = merge_vectors(visi1,visi2);//TODO le remove duplicate du merge surement inutile
   clean_vector(visi1);
