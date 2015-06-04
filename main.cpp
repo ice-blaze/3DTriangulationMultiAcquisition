@@ -897,7 +897,7 @@ int main(int argc, char* argv[])
 
   if (!strcmp(argv[1],"-h"))
   {
-    printf("usage: %s precisionNonMerged precisionMerged inputFolder outFolder [-o]\n", argv[0]);
+    printf("usage: %s precisionNonMerged precisionMerged inputFolder outputFolder [-o]\nIf folder already exit, do nothing. If folder doesn't exist, it create it", argv[0]);
     return EXIT_FAILURE;
   }
 
