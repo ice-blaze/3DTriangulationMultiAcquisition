@@ -15,24 +15,31 @@ Compilation : gcc -Wall -O3 triangule_scan_ply.c -lm
 #include <math.h>
 #include <time.h>
 #include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <chrono>
 
 // Pour passer de coordonnées de type double en int32_t
 #define PRECISION 10000000
 
+#include <bitset>
 #include <map>
 #include <algorithm>
 #include <iostream>
 using namespace std;
 
-
 const unsigned char nb_cote_triangle = 3; //Pour l'écriture de 3 en binaire
 
 // Les points de mesure à prendre en considération seront à l'intérieur d'un
 // parallélipipède compris entre [(xmin, ymin, zmin), (xmax, ymax, zmax)]
-double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
+//double xmin = -1.0, xmax = 3.0, ymin = -2.0, ymax = 3.0, zmin = -1.0, zmax = 3.0;
 //double xmin = -10.0, xmax = 30.0,
 //       ymin = -20.0, ymax = 30.0,
 //       zmin = -10.0, zmax = 30.0;
+
+const double MAX = 10000.0;
+double xmin = -MAX, ymin = -MAX, zmin = -MAX,
+       xmax = MAX,  ymax = MAX,  zmax = MAX;
 
 bool is_equal(double d1, double d2){
   int i1 = d1*PRECISION;
@@ -84,7 +91,7 @@ const int FALSE = 0;
 const int TRUE = 1;
 
 // L'arborescence a environ 9 triangles par point; 10 pour être confortable
-const int nb_triangles_par_point = 10;
+const int nb_triangles_par_point =10;
 int nb_max_triangles;
 
 double seconds(clock_t cpu)
@@ -469,9 +476,9 @@ int insere_point(int p, int32_t*x, int32_t* y, int* nb_triangles,
 //d'identifier rapidement le triangle de la triangulation dans lequel un
 //point se trouve
 int construit_delaunay(int n, int32_t* x, int32_t* y, t_triangle* arbre)
-{ int* permutation;
+{
+  int* permutation;
   int i, nb_triangles;
-
   permutation = (int*) malloc( n*sizeof(int));
   for (i = 0; i < n; i++) permutation[i] = i;
   for (i = 0; i < n-1; i++)
@@ -480,10 +487,12 @@ int construit_delaunay(int n, int32_t* x, int32_t* y, t_triangle* arbre)
   arbre[0] =(t_triangle){n, n+1, n+2, -1, -1, -1, TRUE};
   nb_triangles = 1;
 
+  int sum =0;
   for (i = 0; i < n; i++)
-  {
+  {//TODO insere point bug avec la table
      if (!insere_point(permutation[i], x, y, &nb_triangles, arbre))
-       printf("%de point pas insere; %d\n", i, nb_triangles);
+//       printf("%de point pas insere; %d;\n", i, nb_triangles);
+        ++sum;
      if (nb_triangles >= nb_triangles_par_point*n)
      {
        printf("Arbre mal dimensionne; augmenter nb_triangles_par_point\n");
@@ -492,7 +501,8 @@ int construit_delaunay(int n, int32_t* x, int32_t* y, t_triangle* arbre)
      if (i%(n/100) == 0)
      { printf("\b\b\b%2d%%", 100*i/n); fflush(stdout);}
   }
-  printf("\n");
+
+  printf(" nb de points ignore´ %d\n",sum);
 
   free(permutation);
   return nb_triangles;
@@ -510,7 +520,7 @@ void calcule_phi_theta(POINT origine, POINT p, int32_t *phi, int32_t * theta)
 }
 
 // recoit la position de la station du fichier
-POINT extrait_station(char chemin_ply[]){
+POINT extrait_station(const char chemin_ply[]){
 
   FILE* fichier = fopen(chemin_ply, "rb");
   POINT origine;
@@ -606,7 +616,7 @@ LECTURE_FICHIER lecture_fichier(vector<POINT> vect, POINT origine){
   return res;
 }
 
-LECTURE_FICHIER lecture_fichier(char file_path[]){
+LECTURE_FICHIER lecture_fichier(const char file_path[]){
   int nb_lu;        //nb valeurs lues par fread
   FILE *fichier;
   unsigned taille_suppl; //information supplémentaire pour chaque point
@@ -618,7 +628,7 @@ LECTURE_FICHIER lecture_fichier(char file_path[]){
 
   fichier = fopen(file_path, "rb");
 
-  int i, n; // nombre total de points
+  int i, n;      // nombre total de points
   POINT origine; //Coordonnées de l'appareil de mesure
   POINT *point;  //Coordonnées (x,y,z) de chaque point de mesure
 
@@ -640,9 +650,9 @@ LECTURE_FICHIER lecture_fichier(char file_path[]){
     nb_lu = fread(&temp.z, sizeof(temp.z), 1, fichier);
 
     //TODO pas la meilleur façon de faire, tableau ID surement inutile. Mieux comprendre l'algo pour supprimer le tableau d'ID
-    if (dedans(temp)){
+//    if (dedans(temp)){
       point[nb_retenus++] = temp;
-    }
+//    }
     fseek(fichier, taille_suppl, SEEK_CUR);
   }
   if (!nb_lu) {return res;}
@@ -653,7 +663,7 @@ LECTURE_FICHIER lecture_fichier(char file_path[]){
   for (i = 0; i < nb_retenus; i++){
       res.id[i] = i;
   }
-  res.id[nb_retenus] = nb_retenus;
+  res.id[nb_retenus]   = nb_retenus;
   res.id[nb_retenus+1] = nb_retenus+1;
   res.id[nb_retenus+2] = nb_retenus+2;
 
@@ -685,6 +695,7 @@ OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
   OUTPUT_TRIANGULATION res;
   res.inputs = in;
   res.err = TRUE;
+
 
   // pour que le code en dessous soit moins chargé
   int nb_retenus = in.nb_retenus;
@@ -740,7 +751,7 @@ void ecrire_fichier(const string output_path, OUTPUT_TRIANGULATION in, COULEUR c
   fprintf(fichier, "property list uchar int vertex_index\n");
   fprintf(fichier, "property uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n");
 
-  if(couleurID>5) {couleurID=5;}
+  if(couleurID>11) {couleurID=11;}
 
   for (int i = 0; i < in.inputs.nb_retenus; i++){
       fwrite(&in.inputs.point[i].x,1,sizeof(double),fichier);
@@ -819,6 +830,42 @@ void clean_vector(vector<T> _v){
   _v.shrink_to_fit();
 }
 
+string binary(unsigned x){
+    string s;
+    do{
+        s.push_back('0' + (x & 1));
+    } while (x >>= 1);
+
+    while(s.size()<15){
+      s.push_back('0');
+    }
+    reverse(s.begin(), s.end());
+    return s;
+}
+
+string addSlashEnd(string str){
+  if(str.back() != '/')
+    str += "/";
+  return str;
+}
+
+vector<string> listFile(string path){
+  path = addSlashEnd(path);
+
+  vector<string> result;
+  DIR *pDIR;
+  struct dirent *entry;
+  if( (pDIR=opendir(path.c_str())) ){
+    while((entry = readdir(pDIR))){
+      if( strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 ){
+        result.push_back(path + entry->d_name);
+      }
+    }
+    closedir(pDIR);
+    return result;
+  }
+}
+
 /*debug*/
 void deb_sizes(map<unsigned int,vector<POINT>> _map){
   printf("\n nombre de vector : %d\n",_map.size());
@@ -832,37 +879,62 @@ void deb_sizes(map<unsigned int,vector<POINT>> _map){
 
 int main(int argc, char* argv[])
 {
-  COULEUR couleurs[6];
+  COULEUR couleurs[12];
   couleurs[0].x=0  ; couleurs[0].y=0  ; couleurs[0].z=255;
   couleurs[1].x=0  ; couleurs[1].y=255; couleurs[1].z=0  ;
   couleurs[2].x=255; couleurs[2].y=0  ; couleurs[2].z=0  ;
   couleurs[3].x=0  ; couleurs[3].y=255; couleurs[3].z=255;
   couleurs[4].x=255; couleurs[4].y=0  ; couleurs[4].z=255;
   couleurs[5].x=255; couleurs[5].y=255; couleurs[5].z=0  ;
+  couleurs[6].x=0  ; couleurs[0].y=0  ; couleurs[0].z=128;
+  couleurs[7].x=0  ; couleurs[1].y=128; couleurs[1].z=0  ;
+  couleurs[8].x=128; couleurs[2].y=0  ; couleurs[2].z=0  ;
+  couleurs[9].x=0  ; couleurs[3].y=128; couleurs[3].z=128;
+  couleurs[10].x=128; couleurs[4].y=0  ; couleurs[4].z=128;
+  couleurs[11].x=128; couleurs[5].y=128; couleurs[5].z=0  ;
+
+  chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
 
   if (!strcmp(argv[1],"-h"))
   {
-    printf("usage: %s precisionNonMerged precisionMerged infile1.bin [infile2.bin ... infileN.bin] outfileprefix\n", argv[0]);
+    printf("usage: %s precisionNonMerged precisionMerged inputFolder outFolder [-o]\n", argv[0]);
     return EXIT_FAILURE;
   }
 
+  bool saveOriginal = (argc == 6 && !strcmp(argv[5],"-o"));
+
   /* récupérer les positions des stations */
-  const int nb_stations = argc-4;
+  string inputPath = argv[3];
+  vector<string> inputs = listFile(inputPath);
+
+  const int nb_stations = inputs.size();
   POINT stations[nb_stations];//TODO opti struct station qui contient la position, et son file_path
   for(int i=0;i<nb_stations;i++){
-    stations[i] = extrait_station(argv[i+3]);
+    stations[i] = extrait_station(inputs[i].c_str());
   }
 
   double LIMITE1 = atof(argv[1]);
   double LIMITE2 = atof(argv[2]);
-  string output_name(argv[argc-1]);
+  string output_name(argv[4]);
+  output_name = addSlashEnd(output_name);
+  mkdir(output_name.c_str(),0777);
+  string output_original = output_name+"original/";
   map<unsigned int,vector<POINT>> points;
 
   /******************* lecture du fichier de données ************************/
   /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
-  for(int i=3;i<nb_stations+3;i++){
-    LECTURE_FICHIER input_tri = lecture_fichier(argv[i]);
-    OUTPUT_TRIANGULATION out_tri = triangulation(input_tri, LIMITE1*100000000);// *100000000 pour ignoré cetter règle lors des première triangulation
+  for(int i=0;i<nb_stations;i++){
+    if(saveOriginal){
+      LECTURE_FICHIER input_temp = lecture_fichier(inputs[i].c_str());
+      OUTPUT_TRIANGULATION out_temp = triangulation(input_temp, LIMITE1);
+      mkdir(output_original.c_str(),0777);
+      ecrire_fichier(output_original+to_string(i)+".ply",out_temp,couleurs,i);
+      free_triangulation_partial(out_temp);
+      free(out_temp.arbre);
+    }
+
+    LECTURE_FICHIER input_tri = lecture_fichier(inputs[i].c_str());
+    OUTPUT_TRIANGULATION out_tri = triangulation(input_tri, 100000000);// *100000000 pour ignorer cette règle lors des première triangulation
 
     if (input_tri.err == TRUE) {return EXIT_FAILURE;}
     if (out_tri.err==TRUE)     {return EXIT_FAILURE;}
@@ -872,6 +944,7 @@ int main(int argc, char* argv[])
     free(out_tri.arbre);
     get_points_by_allmask(points,out_tri);
   }
+
 
   /* TRIANGULATION GENERALISÉ */
   for(map<unsigned int,vector<POINT>>::iterator iter = points.begin(); iter != points.end(); ++iter){
@@ -886,18 +959,23 @@ int main(int argc, char* argv[])
     int station = -1;
     while(!(k&pow2(++station))) {}
 
-    // station unique si seulement 1 bit existe
-    // sinon une des stations selectionné
+
+    // c'est une station unique si seulement 1 bit existe
+    // sinon c'est une des stations selectionné
     LECTURE_FICHIER lf_station1 = lecture_fichier(points[k],stations[station]);
     if (lf_station1.err == TRUE){return EXIT_FAILURE;}
     // si une seule station LIMITE 1
     // si plusieur station, une des stations donc LIMITE2
     OUTPUT_TRIANGULATION ot_station1 = triangulation(lf_station1,(isPow2(k))?LIMITE1:LIMITE2);
     if (ot_station1.err == TRUE){return EXIT_FAILURE;}
-    ecrire_fichier(output_name+to_string(k)+".ply",ot_station1,couleurs,k-1);//TODO afficher le nombre en binaire
+    ecrire_fichier(output_name+binary(k)+".ply",ot_station1,couleurs,k-1);//TODO afficher le nombre en binaire
     clean_vector(points[k]);
     free_triangulation_complete(ot_station1);
   }
+
+  chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+  auto duration = chrono::duration_cast<chrono::seconds>( t2 - t1 ).count();
+  cout << "Temps total de l'execution : " << duration << "s" <<endl;
 
   return EXIT_SUCCESS;
 }
