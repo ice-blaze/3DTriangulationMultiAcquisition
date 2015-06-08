@@ -18,6 +18,8 @@ Compilation : gcc -Wall -O3 triangule_scan_ply.c -lm
 #include <dirent.h>
 #include <sys/stat.h>
 #include <chrono>
+#include "sys/types.h"
+#include "sys/sysinfo.h"
 
 // Pour passer de coordonnées de type double en int32_t
 #define PRECISION 10000000
@@ -79,10 +81,12 @@ struct POINT {double x; double y; double z;unsigned int stations;
 void print(POINT p) {cout << "point : " << p.x << " " << p.y << " " << p.z << endl;}
 typedef struct {unsigned char x; unsigned char y; unsigned char z;} COULEUR;
 
+// puissance de 2
 int pow2( unsigned int pwr ) {
    return 1 << pwr;
 }
 
+// est une puissance de 2 ?
 bool isPow2 (unsigned int x){
   return ((x != 0) && ((x & (~x + 1)) == x));
 }
@@ -638,6 +642,8 @@ LECTURE_FICHIER lecture_fichier(const char file_path[]){
   nb_lu = fread(&n, sizeof n, 1, fichier);
   nb_lu = fread(&taille_suppl, sizeof taille_suppl, 1, fichier);
 
+  cout << "----------------" << endl << taille_suppl << endl << "--------------------" << endl;
+
   point = (POINT *) malloc(n * sizeof(POINT));
   res.id = (unsigned *) malloc((n+3) * sizeof(unsigned));
 
@@ -877,8 +883,26 @@ void deb_sizes(map<unsigned int,vector<POINT>> _map){
   printf("------------");
 }
 
+long long memory(){
+  struct sysinfo memInfo;
+  sysinfo (&memInfo);
+  return memInfo.totalram-memInfo.freeram;
+}
+
+long long keepMaxMemory(long long old){
+  long long mem = memory();
+  if (old > mem)
+    return old;
+  return mem;
+}
+
 int main(int argc, char* argv[])
 {
+  auto memoryAtStart = memory();
+  long long maxMemory = 0;
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  start = std::chrono::system_clock::now();
+
   COULEUR couleurs[12];
   couleurs[0].x=0  ; couleurs[0].y=0  ; couleurs[0].z=255;
   couleurs[1].x=0  ; couleurs[1].y=255; couleurs[1].z=0  ;
@@ -892,8 +916,6 @@ int main(int argc, char* argv[])
   couleurs[9].x=0  ; couleurs[3].y=128; couleurs[3].z=128;
   couleurs[10].x=128; couleurs[4].y=0  ; couleurs[4].z=128;
   couleurs[11].x=128; couleurs[5].y=128; couleurs[5].z=0  ;
-
-  chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
 
   if (!strcmp(argv[1],"-h"))
   {
@@ -917,34 +939,35 @@ int main(int argc, char* argv[])
   double LIMITE2 = atof(argv[2]);
   string output_name(argv[4]);
   output_name = addSlashEnd(output_name);
-  mkdir(output_name.c_str(),0777);
   string output_original = output_name+"original/";
   map<unsigned int,vector<POINT>> points;
 
   /******************* lecture du fichier de données ************************/
   /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
   for(int i=0;i<nb_stations;i++){
+    //dans le cas où l'utilisateur veut les triangulation original, tout est fait ici
     if(saveOriginal){
       LECTURE_FICHIER input_temp = lecture_fichier(inputs[i].c_str());
       OUTPUT_TRIANGULATION out_temp = triangulation(input_temp, LIMITE1);
-      mkdir(output_original.c_str(),0777);
       ecrire_fichier(output_original+to_string(i)+".ply",out_temp,couleurs,i);
       free_triangulation_partial(out_temp);
       free(out_temp.arbre);
     }
 
     LECTURE_FICHIER input_tri = lecture_fichier(inputs[i].c_str());
-    OUTPUT_TRIANGULATION out_tri = triangulation(input_tri, 100000000);// *100000000 pour ignorer cette règle lors des première triangulation
+    OUTPUT_TRIANGULATION out_tri = triangulation(input_tri, 100000000);// 100000000 pour ignorer cette règle lors des première triangulation
 
     if (input_tri.err == TRUE) {return EXIT_FAILURE;}
-    if (out_tri.err==TRUE)     {return EXIT_FAILURE;}
+    if (out_tri.err   == TRUE) {return EXIT_FAILURE;}
+
+    // pour les metriques
+    maxMemory = keepMaxMemory(maxMemory);
 
     free_triangulation_partial(out_tri);
     set_station_on_points(out_tri,stations,nb_stations);
     free(out_tri.arbre);
     get_points_by_allmask(points,out_tri);
   }
-
 
   /* TRIANGULATION GENERALISÉ */
   for(map<unsigned int,vector<POINT>>::iterator iter = points.begin(); iter != points.end(); ++iter){
@@ -959,6 +982,17 @@ int main(int argc, char* argv[])
     int station = -1;
     while(!(k&pow2(++station))) {}
 
+    // debug
+//    for(int i=0;i<points.size();i++){
+//      if (points[i].size()==0) {continue;}
+//      cout << points[i].size() << endl;
+//    }
+
+    // ignore les triangulation qui ont trop peu de points
+    if(points[k].size()<100){ // le 100 est arbitraire, on pourrait surement mettre un chiffre plus bas.
+      cout << output_name+binary(k)+".ply est ignoré car contient "<< points[k].size() <<"<100 points" << endl;
+      continue;
+    }
 
     // c'est une station unique si seulement 1 bit existe
     // sinon c'est une des stations selectionné
@@ -967,15 +1001,18 @@ int main(int argc, char* argv[])
     // si une seule station LIMITE 1
     // si plusieur station, une des stations donc LIMITE2
     OUTPUT_TRIANGULATION ot_station1 = triangulation(lf_station1,(isPow2(k))?LIMITE1:LIMITE2);
+    maxMemory = keepMaxMemory(maxMemory);
     if (ot_station1.err == TRUE){return EXIT_FAILURE;}
     ecrire_fichier(output_name+binary(k)+".ply",ot_station1,couleurs,k-1);//TODO afficher le nombre en binaire
     clean_vector(points[k]);
     free_triangulation_complete(ot_station1);
   }
 
-  chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
-  auto duration = chrono::duration_cast<chrono::seconds>( t2 - t1 ).count();
-  cout << "Temps total de l'execution : " << duration << "s" <<endl;
+  //affichage de metriques
+  end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end-start;
+  cout << "Temps total de l'execution : " << elapsed_seconds.count() << "s" <<endl;
+  cout << "Usage maximum de la maymoire : " << (maxMemory-memoryAtStart)/(1000000.0) << " MB" << endl;
 
   return EXIT_SUCCESS;
 }
