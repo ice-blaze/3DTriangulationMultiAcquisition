@@ -81,12 +81,10 @@ struct POINT {double x; double y; double z;unsigned int stations;
 void print(POINT p) {cout << "point : " << p.x << " " << p.y << " " << p.z << endl;}
 typedef struct {unsigned char x; unsigned char y; unsigned char z;} COULEUR;
 
-// puissance de 2
 int pow2( unsigned int pwr ) {
    return 1 << pwr;
 }
 
-// est une puissance de 2 ?
 bool isPow2 (unsigned int x){
   return ((x != 0) && ((x & (~x + 1)) == x));
 }
@@ -493,7 +491,7 @@ int construit_delaunay(int n, int32_t* x, int32_t* y, t_triangle* arbre)
 
   int sum =0;
   for (i = 0; i < n; i++)
-  {//TODO insere point bug avec la table
+  {
      if (!insere_point(permutation[i], x, y, &nb_triangles, arbre))
 //       printf("%de point pas insere; %d;\n", i, nb_triangles);
         ++sum;
@@ -506,7 +504,7 @@ int construit_delaunay(int n, int32_t* x, int32_t* y, t_triangle* arbre)
      { printf("\b\b\b%2d%%", 100*i/n); fflush(stdout);}
   }
 
-  printf(" nb de points ignore´ %d\n",sum);
+  printf(" nb de points ignore %d\n",sum);
 
   free(permutation);
   return nb_triangles;
@@ -552,7 +550,7 @@ int dedans(POINT p)
         p.y >= ymin && p.y <= ymax && p.z >= zmin && p.z <= zmax;}
 
 
-double distance(POINT p, POINT q){//TODO remove sqr
+double distance(POINT p, POINT q){//OPTI remove sqr ?
   return sqr((p.x-q.x)*(p.x-q.x)+
              (p.y-q.y)*(p.y-q.y)+
              (p.z-q.z)*(p.z-q.z));
@@ -655,8 +653,8 @@ LECTURE_FICHIER lecture_fichier(const char file_path[]){
     nb_lu = fread(&temp.y, sizeof(temp.y), 1, fichier);
     nb_lu = fread(&temp.z, sizeof(temp.z), 1, fichier);
 
-    //TODO pas la meilleur façon de faire, tableau ID surement inutile. Mieux comprendre l'algo pour supprimer le tableau d'ID
-//    if (dedans(temp)){
+    //OPTI pas la meilleur façon de faire, tableau ID surement inutile. Mieux comprendre l'algo pour supprimer le tableau d'ID
+//    if (dedans(temp)){ // pas utilisé dans notre cas, mais si on veut limité la taille de l'input à un bloc plus petite, on a besoins de cette condition
       point[nb_retenus++] = temp;
 //    }
     fseek(fichier, taille_suppl, SEEK_CUR);
@@ -750,8 +748,7 @@ OUTPUT_TRIANGULATION triangulation(LECTURE_FICHIER in, const double LIMITE){
 void ecrire_fichier(const string output_path, OUTPUT_TRIANGULATION in, COULEUR couleurs[], int couleurID){
   clock_t cpu = clock();
   FILE *fichier = fopen(output_path.c_str(), "wb");
-  fprintf(fichier, "ply\nformat binary_little_endian 1.0\nelement vertex %d\n",
-          in.inputs.nb_retenus);
+  fprintf(fichier, "ply\nformat binary_little_endian 1.0\nelement vertex %d\n",in.inputs.nb_retenus);
   fprintf(fichier, "property double x\nproperty double y\nproperty double z\n");
   fprintf(fichier, "element face %d\n", in.nb_triangles_finaux);
   fprintf(fichier, "property list uchar int vertex_index\n");
@@ -775,7 +772,7 @@ void ecrire_fichier(const string output_path, OUTPUT_TRIANGULATION in, COULEUR c
         fwrite(&in.arbre[i].p2, 1, sizeof(int), fichier);
         fwrite(&in.arbre[i].p1, 1, sizeof(int), fichier);
 
-         /* attribut une couleur en fonction des stations qui peuvent la voir */ // TODO FAIRE DE MANIERE PROCEDURALE (masque de bit)
+         /* attribut une couleur en fonction des stations qui peuvent la voir */
          fwrite(&couleurs[couleurID].x, 1, sizeof(unsigned char), fichier);
          fwrite(&couleurs[couleurID].y, 1, sizeof(unsigned char), fichier);
          fwrite(&couleurs[couleurID].z, 1, sizeof(unsigned char), fichier);
@@ -790,13 +787,13 @@ void ecrire_fichier(const string output_path, OUTPUT_TRIANGULATION in, COULEUR c
          output_path.c_str(), in.inputs.nb_retenus, in.nb_triangles_finaux, seconds(cpu));
 }
 
-void set_station_on_points(const OUTPUT_TRIANGULATION in,const POINT stations[], const int nb_stations){//TODO changer station en vecteur pour eviter d'avoir le nb_stations
+void set_station_on_points(const OUTPUT_TRIANGULATION in,const vector<POINT> stations){
   for (int i = 1; i < in.nb_triangles; i++){
     if (in.arbre[i].final){
       if (in.arbre[i].p1 >= in.inputs.nb_retenus || in.arbre[i].p2 >= in.inputs.nb_retenus || in.arbre[i].p3 >= in.inputs.nb_retenus)
         ; // triangle fictif
       else {
-        for(int j=0;j<nb_stations;j++){ //TODO amelioration, on peut ignorer la station origine et directement mettre tous les points avec le masque sans passé par visible
+        for(int j=0;j<stations.size();j++){ //OPTI amelioration, on peut ignorer la station origine et directement mettre tous les points avec le masque sans passé par visible
           if(visible(in.inputs.origine,stations[j],
                       in.inputs.point[in.arbre[i].p3],
                       in.inputs.point[in.arbre[i].p2],
@@ -812,6 +809,7 @@ void set_station_on_points(const OUTPUT_TRIANGULATION in,const POINT stations[],
   }
 }
 
+// tri les différents points par type de visibilité
 void get_points_by_allmask(map<unsigned int,vector<POINT>> &resultat, const OUTPUT_TRIANGULATION in){//in pour input
   for (int i = 0; i < in.inputs.nb_retenus; i++){
       resultat[in.inputs.point[i].stations].push_back(in.inputs.point[i]);
@@ -830,12 +828,14 @@ void free_triangulation_complete(OUTPUT_TRIANGULATION out){
   free(out.inputs.point);
 }
 
+// libère proprement un vecteur
 template <typename T>
 void clean_vector(vector<T> _v){
   _v.clear();
   _v.shrink_to_fit();
 }
 
+// convertie un nombre en string binaire
 string binary(unsigned x){
     string s;
     do{
@@ -849,12 +849,14 @@ string binary(unsigned x){
     return s;
 }
 
+// ajoute un / à la fin d'un string s'il n'y en a pas
 string addSlashEnd(string str){
   if(str.back() != '/')
     str += "/";
   return str;
 }
 
+// lister les fichiers d'un dossier
 vector<string> listFile(string path){
   path = addSlashEnd(path);
 
@@ -883,12 +885,13 @@ void deb_sizes(map<unsigned int,vector<POINT>> _map){
   printf("------------");
 }
 
+/* métriques */
 long long memory(){
   struct sysinfo memInfo;
   sysinfo (&memInfo);
   return memInfo.totalram-memInfo.freeram;
 }
-
+/* métriques */
 long long keepMaxMemory(long long old){
   long long mem = memory();
   if (old > mem)
@@ -898,11 +901,13 @@ long long keepMaxMemory(long long old){
 
 int main(int argc, char* argv[])
 {
+  // pour les métriques
   auto memoryAtStart = memory();
   long long maxMemory = 0;
   std::chrono::time_point<std::chrono::system_clock> start, end;
   start = std::chrono::system_clock::now();
 
+  // tableau de couleurs pour les différente triangulation, s'il y en a plus que de couleur alors le surplus garde la dernière couleur
   COULEUR couleurs[12];
   couleurs[0].x=0  ; couleurs[0].y=0  ; couleurs[0].z=255;
   couleurs[1].x=0  ; couleurs[1].y=255; couleurs[1].z=0  ;
@@ -917,6 +922,7 @@ int main(int argc, char* argv[])
   couleurs[10].x=128; couleurs[4].y=0  ; couleurs[4].z=128;
   couleurs[11].x=128; couleurs[5].y=128; couleurs[5].z=0  ;
 
+  // helper dans la console
   if (!strcmp(argv[1],"-h"))
   {
     printf("usage: %s precisionNonMerged precisionMerged inputFolder outputFolder [-o]\nIf folder already exit, do nothing. If folder doesn't exist, it create it", argv[0]);
@@ -929,10 +935,9 @@ int main(int argc, char* argv[])
   string inputPath = argv[3];
   vector<string> inputs = listFile(inputPath);
 
-  const int nb_stations = inputs.size();
-  POINT stations[nb_stations];//TODO opti struct station qui contient la position, et son file_path
-  for(int i=0;i<nb_stations;i++){
-    stations[i] = extrait_station(inputs[i].c_str());
+  vector<POINT> stations;//OPTI struct station qui contient la position, et son file_path
+  for(int i=0;i<inputs.size();i++){
+    stations.push_back(extrait_station(inputs[i].c_str()));
   }
 
   double LIMITE1 = atof(argv[1]);
@@ -941,19 +946,21 @@ int main(int argc, char* argv[])
   output_name = addSlashEnd(output_name);
   string output_original = output_name+"original/";
   map<unsigned int,vector<POINT>> points;
+  mkdir(output_name.c_str(),0777);
 
-  /******************* lecture du fichier de données ************************/
-  /***** Sélection des points à retenir, calcul des azimuts et élévations ***/
-  for(int i=0;i<nb_stations;i++){
-    //dans le cas où l'utilisateur veut les triangulation original, tout est fait ici
+  // pour toutes les triangulation originales, assigner à leurs points, les stations qui les voient
+  for(int i=0;i<stations.size();i++){
+    // si l'utilisateur veut garder les triangulations originales, obliger de le faire à part car n'utilise pas la même limite que pour après
     if(saveOriginal){
       LECTURE_FICHIER input_temp = lecture_fichier(inputs[i].c_str());
       OUTPUT_TRIANGULATION out_temp = triangulation(input_temp, LIMITE1);
+      mkdir(output_original.c_str(),0777);
       ecrire_fichier(output_original+to_string(i)+".ply",out_temp,couleurs,i);
       free_triangulation_partial(out_temp);
       free(out_temp.arbre);
     }
 
+    // triangulation des
     LECTURE_FICHIER input_tri = lecture_fichier(inputs[i].c_str());
     OUTPUT_TRIANGULATION out_tri = triangulation(input_tri, 100000000);// 100000000 pour ignorer cette règle lors des première triangulation
 
@@ -964,35 +971,38 @@ int main(int argc, char* argv[])
     maxMemory = keepMaxMemory(maxMemory);
 
     free_triangulation_partial(out_tri);
-    set_station_on_points(out_tri,stations,nb_stations);
+    // assigne aux points les stations qui le voit
+    set_station_on_points(out_tri,stations);
+    // libère les triangle qui ne sont plus utiles
     free(out_tri.arbre);
     get_points_by_allmask(points,out_tri);
   }
 
-  /* TRIANGULATION GENERALISÉ */
+  // maintenant que nous avons tous les points avec leurs visibilité, il faut faire leurs triangulations
   for(map<unsigned int,vector<POINT>>::iterator iter = points.begin(); iter != points.end(); ++iter){
     unsigned int k =  iter->first;
-    if(k == 0){ //TODO pourquoi il y a (un)des points qui ne sont vu par aucune station ?
+    if(k == 0){ //OPTI pourquoi il y a (un)des points qui ne sont vu par aucune station ?
       continue;
     }
 
-    // récupère le premier bit à 1 pour définir la station utilisé
+    // récupère l'indice du premier bit à 1 pour définir la station utilisé
     // dans le cas d'un algo  mergé, retourne le premier bit à 1
     // (vu qu'il faut triangulé en fonction d'une des stations)
     int station = -1;
     while(!(k&pow2(++station))) {}
 
     // debug
-//    for(int i=0;i<points.size();i++){
-//      if (points[i].size()==0) {continue;}
-//      cout << points[i].size() << endl;
-//    }
+    for(int i=0;i<points.size();i++){
+      if (points[i].size()==0) {continue;}
+      cout << points[i].size() << endl;
+    }
 
     // ignore les triangulation qui ont trop peu de points
     if(points[k].size()<100){ // le 100 est arbitraire, on pourrait surement mettre un chiffre plus bas.
       cout << output_name+binary(k)+".ply est ignoré car contient "<< points[k].size() <<"<100 points" << endl;
       continue;
     }
+
 
     // c'est une station unique si seulement 1 bit existe
     // sinon c'est une des stations selectionné
@@ -1003,7 +1013,7 @@ int main(int argc, char* argv[])
     OUTPUT_TRIANGULATION ot_station1 = triangulation(lf_station1,(isPow2(k))?LIMITE1:LIMITE2);
     maxMemory = keepMaxMemory(maxMemory);
     if (ot_station1.err == TRUE){return EXIT_FAILURE;}
-    ecrire_fichier(output_name+binary(k)+".ply",ot_station1,couleurs,k-1);//TODO afficher le nombre en binaire
+    ecrire_fichier(output_name+binary(k)+".ply",ot_station1,couleurs,k-1);
     clean_vector(points[k]);
     free_triangulation_complete(ot_station1);
   }
